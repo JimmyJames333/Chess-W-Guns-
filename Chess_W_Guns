@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Chess RPG - Third Person</title>
+    <style>
+        body {
+            margin: 0;
+            background: #111;
+            color: #fff;
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: row;
+            height: 100vh;
+        }
+
+        /* Left: game view */
+        #game-container {
+            flex: 3;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            perspective: 800px; /* fake 3D */
+        }
+
+        #board {
+            width: 480px;
+            height: 480px;
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            grid-template-rows: repeat(8, 1fr);
+            transform: rotateX(60deg); /* tilt board for third-person look */
+            transform-origin: center;
+        }
+
+        .tile {
+            width: 100%;
+            height: 100%;
+            box-sizing: border-box;
+            border: 1px solid #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        .dark {
+            background: #444;
+        }
+
+        .light {
+            background: #bbb;
+            color: #000;
+        }
+
+        .player {
+            width: 80%;
+            height: 80%;
+            border-radius: 50%;
+            background: #00ff88;
+            border: 2px solid #fff;
+        }
+
+        .enemy {
+            width: 80%;
+            height: 80%;
+            border-radius: 50%;
+            background: #ff4444;
+            border: 2px solid #fff;
+        }
+
+        /* Right: HUD / stats */
+        #hud {
+            flex: 1;
+            padding: 20px;
+            background: #181818;
+            border-left: 2px solid #333;
+        }
+
+        #hud h1 {
+            margin-top: 0;
+        }
+
+        .stat {
+            margin: 10px 0;
+        }
+
+        #log {
+            margin-top: 20px;
+            height: 200px;
+            overflow-y: auto;
+            border: 1px solid #333;
+            padding: 10px;
+            background: #101010;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <div id="board"></div>
+    </div>
+
+    <div id="hud">
+        <h1>Chess RPG</h1>
+        <div class="stat">HP: <span id="hp">20</span></div>
+        <div class="stat">Attack: <span id="atk">5</span></div>
+        <div class="stat">Position: <span id="pos">0,0</span></div>
+        <p>Controls: W/A/S/D to move (like a chess king), Space to attack.</p>
+        <div id="log"></div>
+    </div>
+
+    <script>
+        const boardEl = document.getElementById("board");
+        const hpEl = document.getElementById("hp");
+        const atkEl = document.getElementById("atk");
+        const posEl = document.getElementById("pos");
+        const logEl = document.getElementById("log");
+
+        const BOARD_SIZE = 8;
+
+        // Player stats
+        let player = {
+            x: 0,
+            y: 7, // bottom-left
+            hp: 20,
+            atk: 5
+        };
+
+        // Simple enemy
+        let enemy = {
+            x: 4,
+            y: 3,
+            hp: 10
+        };
+
+        // Create board tiles
+        let tiles = [];
+        for (let y = 0; y < BOARD_SIZE; y++) {
+            for (let x = 0; x < BOARD_SIZE; x++) {
+                const tile = document.createElement("div");
+                tile.classList.add("tile");
+                if ((x + y) % 2 === 0) {
+                    tile.classList.add("light");
+                } else {
+                    tile.classList.add("dark");
+                }
+                tile.dataset.x = x;
+                tile.dataset.y = y;
+                boardEl.appendChild(tile);
+                tiles.push(tile);
+            }
+        }
+
+        function getTile(x, y) {
+            return tiles.find(t => Number(t.dataset.x) === x && Number(t.dataset.y) === y);
+        }
+
+        function render() {
+            // Clear pieces
+            tiles.forEach(t => {
+                t.innerHTML = "";
+            });
+
+            // Draw player
+            const playerTile = getTile(player.x, player.y);
+            const playerDiv = document.createElement("div");
+            playerDiv.classList.add("player");
+            playerTile.appendChild(playerDiv);
+
+            // Draw enemy if alive
+            if (enemy.hp > 0) {
+                const enemyTile = getTile(enemy.x, enemy.y);
+                const enemyDiv = document.createElement("div");
+                enemyDiv.classList.add("enemy");
+                enemyTile.appendChild(enemyDiv);
+            }
+
+            // Update HUD
+            hpEl.textContent = player.hp;
+            atkEl.textContent = player.atk;
+            posEl.textContent = player.x + "," + player.y;
+        }
+
+        function log(message) {
+            const p = document.createElement("p");
+            p.textContent = message;
+            logEl.appendChild(p);
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+
+        function movePlayer(dx, dy) {
+            const newX = player.x + dx;
+            const newY = player.y + dy;
+
+            // Stay on board
+            if (newX < 0 || newX >= BOARD_SIZE || newY < 0 || newY >= BOARD_SIZE) {
+                log("You can't move off the board.");
+                return;
+            }
+
+            player.x = newX;
+            player.y = newY;
+            log("You moved to " + newX + "," + newY);
+            render();
+        }
+
+        function attack() {
+            if (player.x === enemy.x && player.y === enemy.y && enemy.hp > 0) {
+                enemy.hp -= player.atk;
+                log("You attacked the enemy! Enemy HP: " + enemy.hp);
+                if (enemy.hp <= 0) {
+                    log("Enemy defeated!");
+                }
+            } else {
+                log("No enemy on this tile.");
+            }
+            render();
+        }
+
+        // Keyboard controls: W/A/S/D + Space
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "w") movePlayer(0, -1);
+            if (e.key === "s") movePlayer(0, 1);
+            if (e.key === "a") movePlayer(-1, 0);
+            if (e.key === "d") movePlayer(1, 0);
+            if (e.key === " ") attack();
+        });
+
+        // Initial render
+        render();
+        log("Welcome to Chess RPG. Move to the red enemy and press Space to attack.");
+    </script>
+
+</body>
+</html>

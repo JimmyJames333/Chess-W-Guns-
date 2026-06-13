@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Chess RPG - Turn Based with Pathfinding</title>
+    <title>Chess RPG - Waves + Healing</title>
     <style>
         body {
             margin: 0;
@@ -78,8 +78,9 @@
         <h1>Turn‑Based Chess RPG</h1>
         <div>HP: <span id="hp">20</span></div>
         <div>Attack: <span id="atk">5</span></div>
+        <div>Wave: <span id="wave">1</span></div>
         <div>Turn: <span id="turn">Player</span></div>
-        <p>Controls: W/A/S/D to move, Space to attack (only on your turn)</p>
+        <p>Controls: W/A/S/D to move, Space to attack</p>
         <div id="log"></div>
     </div>
 
@@ -87,13 +88,15 @@
         const boardEl = document.getElementById("board");
         const hpEl = document.getElementById("hp");
         const atkEl = document.getElementById("atk");
+        const waveEl = document.getElementById("wave");
         const turnEl = document.getElementById("turn");
         const logEl = document.getElementById("log");
 
         const BOARD_SIZE = 8;
 
         let player = { x: 0, y: 7, hp: 20, atk: 5 };
-        let enemy = { x: 4, y: 3, hp: 10, atk: 3 };
+        let enemy = null;
+        let wave = 1;
 
         let tiles = [];
         let playerTurn = true;
@@ -130,7 +133,7 @@
             pDiv.classList.add("player");
             pTile.appendChild(pDiv);
 
-            if (enemy.hp > 0) {
+            if (enemy && enemy.hp > 0) {
                 const eTile = getTile(enemy.x, enemy.y);
                 const eDiv = document.createElement("div");
                 eDiv.classList.add("enemy");
@@ -139,7 +142,36 @@
 
             hpEl.textContent = player.hp;
             atkEl.textContent = player.atk;
+            waveEl.textContent = wave;
             turnEl.textContent = playerTurn ? "Player" : "Enemy";
+        }
+
+        // Spawn new enemy for next wave
+        function spawnEnemy() {
+            wave++;
+            waveEl.textContent = wave;
+
+            // Heal 10% of current HP
+            const heal = Math.floor(player.hp * 0.1);
+            player.hp += heal;
+            log("You heal " + heal + " HP for the new wave!");
+
+            // Random spawn not on player
+            let ex, ey;
+            do {
+                ex = Math.floor(Math.random() * BOARD_SIZE);
+                ey = Math.floor(Math.random() * BOARD_SIZE);
+            } while (ex === player.x && ey === player.y);
+
+            enemy = {
+                x: ex,
+                y: ey,
+                hp: 10 + wave * 2,
+                atk: 3 + Math.floor(wave / 2)
+            };
+
+            log("Wave " + wave + " begins! A new enemy appears.");
+            render();
         }
 
         // BFS pathfinding
@@ -204,7 +236,7 @@
         }
 
         function enemyTurn() {
-            if (enemy.hp <= 0) {
+            if (!enemy || enemy.hp <= 0) {
                 playerTurn = true;
                 document.body.style.pointerEvents = "auto";
                 render();
@@ -254,14 +286,16 @@
         function attack() {
             if (!playerTurn) return;
 
-            if (player.x === enemy.x && player.y === enemy.y) {
+            if (enemy && player.x === enemy.x && player.y === enemy.y) {
                 enemy.hp -= player.atk;
                 log("You hit the enemy! Enemy HP: " + enemy.hp);
 
                 if (enemy.hp <= 0) {
                     log("Enemy defeated!");
+                    enemy = null;
+                    spawnEnemy(); // NEW WAVE
                     render();
-                    return; // IMPORTANT: stop turn immediately
+                    return;
                 }
             } else {
                 log("No enemy here.");
@@ -280,6 +314,8 @@
             if (e.key === " ") attack();
         });
 
+        // Start first enemy
+        spawnEnemy();
         render();
         log("Game start! Your turn.");
     </script>

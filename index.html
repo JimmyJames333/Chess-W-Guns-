@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Chess RPG - Turn Based</title>
+    <title>Chess RPG - Turn Based with Pathfinding</title>
     <style>
         body {
             margin: 0;
@@ -142,8 +142,67 @@
             turnEl.textContent = playerTurn ? "Player" : "Enemy";
         }
 
+        // Simple BFS pathfinding on grid
+        function findNextStep(startX, startY, targetX, targetY) {
+            const dirs = [
+                { dx: 1, dy: 0 },
+                { dx: -1, dy: 0 },
+                { dx: 0, dy: 1 },
+                { dx: 0, dy: -1 }
+            ];
+
+            const visited = Array.from({ length: BOARD_SIZE }, () =>
+                Array(BOARD_SIZE).fill(false)
+            );
+            const queue = [];
+            const parent = {};
+
+            function key(x, y) { return x + "," + y; }
+
+            queue.push({ x: startX, y: startY });
+            visited[startY][startX] = true;
+            parent[key(startX, startY)] = null;
+
+            while (queue.length > 0) {
+                const current = queue.shift();
+                if (current.x === targetX && current.y === targetY) break;
+
+                for (const d of dirs) {
+                    const nx = current.x + d.dx;
+                    const ny = current.y + d.dy;
+                    if (
+                        nx >= 0 && nx < BOARD_SIZE &&
+                        ny >= 0 && ny < BOARD_SIZE &&
+                        !visited[ny][nx]
+                    ) {
+                        visited[ny][nx] = true;
+                        parent[key(nx, ny)] = current;
+                        queue.push({ x: nx, y: ny });
+                    }
+                }
+            }
+
+            // Reconstruct path
+            const targetKey = key(targetX, targetY);
+            if (!parent[targetKey]) {
+                // No path found, fallback: stay still
+                return { x: startX, y: startY };
+            }
+
+            let step = { x: targetX, y: targetY };
+            let prev = parent[key(step.x, step.y)];
+
+            while (prev && !(prev.x === startX && prev.y === startY)) {
+                step = prev;
+                prev = parent[key(step.x, step.y)];
+            }
+
+            return step;
+        }
+
         function endPlayerTurn() {
             playerTurn = false;
+            document.body.style.pointerEvents = "none";
             render();
             setTimeout(enemyTurn, 600);
         }
@@ -152,6 +211,7 @@
             if (enemy.hp <= 0) {
                 log("Enemy is dead.");
                 playerTurn = true;
+                document.body.style.pointerEvents = "auto";
                 render();
                 return;
             }
@@ -164,20 +224,23 @@
                     log("You died. Game over.");
                 }
                 playerTurn = true;
+                document.body.style.pointerEvents = "auto";
                 render();
                 return;
             }
 
-            // Move enemy toward player
-            if (enemy.x < player.x) enemy.x++;
-            else if (enemy.x > player.x) enemy.x--;
-
-            if (enemy.y < player.y) enemy.y++;
-            else if (enemy.y > player.y) enemy.y--;
-
-            log("Enemy moves to " + enemy.x + "," + enemy.y);
+            // Pathfind toward player
+            const nextStep = findNextStep(enemy.x, enemy.y, player.x, player.y);
+            if (nextStep.x !== enemy.x || nextStep.y !== enemy.y) {
+                enemy.x = nextStep.x;
+                enemy.y = nextStep.y;
+                log("Enemy moves to " + enemy.x + "," + enemy.y);
+            } else {
+                log("Enemy waits.");
+            }
 
             playerTurn = true;
+            document.body.style.pointerEvents = "auto";
             render();
         }
 

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Chess RPG - Waves + Names + Home Screen</title>
+    <title>Chess RPG - Shooting, Shield, Comet Bullets</title>
     <style>
         body {
             margin: 0;
@@ -47,6 +47,7 @@
             height: 80%;
             border-radius: 50%;
             border: 2px solid #fff;
+            position: relative;
         }
 
         .player { background: #00ff88; }
@@ -58,6 +59,34 @@
             font-size: 14px;
             font-weight: bold;
             text-shadow: 2px 2px 4px black;
+        }
+
+        /* Shield visual */
+        .shield {
+            position: absolute;
+            width: 110%;
+            height: 110%;
+            border-radius: 50%;
+            border: 3px solid #00aaff;
+            box-shadow: 0 0 15px #00aaff;
+            pointer-events: none;
+        }
+
+        /* Comet bullet */
+        .bullet {
+            position: absolute;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #4db8ff;
+            box-shadow: 0 0 12px 6px #4db8ff;
+            z-index: 999;
+        }
+
+        /* Enemy bullet (future use) */
+        .enemybullet {
+            background: #ff4444;
+            box-shadow: 0 0 12px 6px #ff4444;
         }
 
         #hud {
@@ -140,8 +169,9 @@
         <div>HP: <span id="hp">20</span></div>
         <div>Attack: <span id="atk">5</span></div>
         <div>Wave: <span id="wave">1</span></div>
+        <div>Shield Cooldown: <span id="scd">0</span></div>
         <div>Turn: <span id="turn">Player</span></div>
-        <p>Controls: W/A/S/D to move, Space to attack</p>
+        <p>Controls: W/A/S/D move, O shoot, P block</p>
         <div id="log"></div>
     </div>
 
@@ -156,6 +186,7 @@
         const hpEl = document.getElementById("hp");
         const atkEl = document.getElementById("atk");
         const waveEl = document.getElementById("wave");
+        const scdEl = document.getElementById("scd");
         const turnEl = document.getElementById("turn");
         const logEl = document.getElementById("log");
 
@@ -164,7 +195,7 @@
 
         const BOARD_SIZE = 8;
 
-        let player = { x: 0, y: 7, hp: 20, atk: 5 };
+        let player = { x: 0, y: 7, hp: 20, atk: 5, shield: false, shieldCooldown: 0 };
         let enemy = null;
         let wave = 1;
 
@@ -210,6 +241,12 @@
             pTile.appendChild(pDiv);
             pTile.appendChild(pName);
 
+            if (player.shield) {
+                const shield = document.createElement("div");
+                shield.classList.add("shield");
+                pTile.appendChild(shield);
+            }
+
             // Enemy
             if (enemy && enemy.hp > 0) {
                 const eTile = getTile(enemy.x, enemy.y);
@@ -227,6 +264,7 @@
             hpEl.textContent = player.hp;
             atkEl.textContent = player.atk;
             waveEl.textContent = wave;
+            scdEl.textContent = player.shieldCooldown;
             turnEl.textContent = playerTurn ? "Player" : "Enemy";
         }
 
@@ -352,13 +390,19 @@
 
             // Attack if adjacent
             if (Math.abs(enemy.x - player.x) + Math.abs(enemy.y - player.y) === 1) {
-                player.hp -= enemy.atk;
-                log(enemyName + " attacks you for " + enemy.atk + " damage!");
+                if (player.shield) {
+                    log(enemyName + " hits your shield!");
+                    player.shield = false;
+                    player.shieldCooldown = 3;
+                } else {
+                    player.hp -= enemy.atk;
+                    log(enemyName + " attacks you for " + enemy.atk + " damage!");
 
-                if (player.hp <= 0) {
-                    log("You died.");
-                    gameOver();
-                    return;
+                    if (player.hp <= 0) {
+                        log("You died.");
+                        gameOver();
+                        return;
+                    }
                 }
 
                 playerTurn = true;
@@ -393,28 +437,99 @@
             player.y = ny;
             log(playerName + " moves to " + nx + "," + ny);
 
+            if (player.shieldCooldown > 0) player.shieldCooldown--;
+
             endPlayerTurn();
         }
 
-        function attack() {
+        function block() {
             if (!playerTurn) return;
 
-            if (enemy && player.x === enemy.x && player.y === enemy.y) {
-                enemy.hp -= player.atk;
-                log(playerName + " hits " + enemyName + "! Enemy HP: " + enemy.hp);
-
-                if (enemy.hp <= 0) {
-                    log(enemyName + " defeated!");
-                    enemy = null;
-                    spawnEnemy();
-                    render();
-                    return;
-                }
-            } else {
-                log("No enemy here.");
+            if (player.shieldCooldown > 0) {
+                log("Shield on cooldown!");
+                return;
             }
 
-            endPlayerTurn();
+            player.shield = true;
+            log(playerName + " raises their shield!");
+
+            render();
+        }
+
+        function shoot() {
+            if (!playerTurn) return;
+            if (!enemy || enemy.hp <= 0) {
+                log("No enemy to shoot.");
+                return;
+            }
+
+            // Check 3×3 zone
+            const dx = enemy.x - player.x;
+            const dy = enemy.y - player.y;
+
+            if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
+                log("Enemy too far to shoot.");
+                return;
+            }
+
+            // Auto-snap horizontally first
+            let dirX = 0, dirY = 0;
+
+            if (dx !== 0) dirX = dx > 0 ? 1 : -1;
+            else if (dy !== 0) dirY = dy > 0 ? 1 : -1;
+            else {
+                log("Enemy is on your tile?!");
+                return;
+            }
+
+            fireBullet(dirX, dirY);
+        }
+
+        function fireBullet(dx, dy) {
+            const bullet = document.createElement("div");
+            bullet.classList.add("bullet");
+
+            const tile = getTile(player.x, player.y);
+            tile.appendChild(bullet);
+
+            let bx = player.x;
+            let by = player.y;
+
+            function step() {
+                bx += dx;
+                by += dy;
+
+                if (bx < 0 || bx >= BOARD_SIZE || by < 0 || by >= BOARD_SIZE) {
+                    bullet.remove();
+                    endPlayerTurn();
+                    return;
+                }
+
+                const newTile = getTile(bx, by);
+                newTile.appendChild(bullet);
+
+                // Hit enemy
+                if (enemy && bx === enemy.x && by === enemy.y) {
+                    enemy.hp -= player.atk;
+                    log(playerName + " shoots " + enemyName + "! HP: " + enemy.hp);
+                    bullet.remove();
+
+                    if (enemy.hp <= 0) {
+                        log(enemyName + " defeated!");
+                        enemy = null;
+                        spawnEnemy();
+                        render();
+                        return;
+                    }
+
+                    endPlayerTurn();
+                    return;
+                }
+
+                requestAnimationFrame(step);
+            }
+
+            requestAnimationFrame(step);
         }
 
         document.addEventListener("keydown", e => {
@@ -424,7 +539,9 @@
             if (e.key === "s") movePlayer(0, 1);
             if (e.key === "a") movePlayer(-1, 0);
             if (e.key === "d") movePlayer(1, 0);
-            if (e.key === " ") attack();
+
+            if (e.key === "o") shoot();
+            if (e.key === "p") block();
         });
     </script>
 

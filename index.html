@@ -1,569 +1,66 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Chess RPG - Shooting, Shield, Comet Bullets</title>
-    <style>
-        body {
-            margin: 0;
-            background: #111;
-            color: #fff;
-            font-family: Arial, sans-serif;
-            display: flex;
-            flex-direction: row;
-            height: 100vh;
-            overflow: hidden;
-        }
-
-        #game-container {
-            flex: 3;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            perspective: 800px;
-        }
-
-        #board {
-            width: 480px;
-            height: 480px;
-            display: grid;
-            grid-template-columns: repeat(8, 1fr);
-            grid-template-rows: repeat(8, 1fr);
-            transform: rotateX(60deg) translateY(40px);
-        }
-
-        .tile {
-            border: 1px solid #333;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            position: relative;
-        }
-
-        .dark { background: #444; }
-        .light { background: #bbb; color: #000; }
-
-        .player, .enemy {
-            width: 80%;
-            height: 80%;
-            border-radius: 50%;
-            border: 2px solid #fff;
-            position: relative;
-        }
-
-        .player { background: #00ff88; }
-        .enemy { background: #ff4444; }
-
-        .nametag {
-            position: absolute;
-            top: -20px;
-            font-size: 14px;
-            font-weight: bold;
-            text-shadow: 2px 2px 4px black;
-        }
-
-        .shield {
-            position: absolute;
-            width: 110%;
-            height: 110%;
-            border-radius: 50%;
-            border: 3px solid #00aaff;
-            box-shadow: 0 0 15px #00aaff;
-            pointer-events: none;
-        }
-
-        .bullet {
-            position: absolute;
-            width: 14px;
-            height: 14px;
-            border-radius: 50%;
-            background: #4db8ff;
-            box-shadow: 0 0 12px 6px #4db8ff;
-            z-index: 999;
-        }
-
-        #hud {
-            flex: 1;
-            padding: 20px;
-            background: #181818;
-            border-left: 2px solid #333;
-        }
-
-        #log {
-            margin-top: 20px;
-            height: 200px;
-            overflow-y: auto;
-            border: 1px solid #333;
-            padding: 10px;
-            background: #101010;
-            font-size: 14px;
-        }
-
-        #homescreen {
-            position: fixed;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            background: rgba(0,0,0,0.95);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            flex-direction: column;
-            z-index: 9999;
-        }
-
-        #homescreen input {
-            padding: 10px;
-            font-size: 20px;
-            margin-bottom: 20px;
-            width: 250px;
-            text-align: center;
-        }
-
-        #homescreen button {
-            padding: 10px 20px;
-            font-size: 22px;
-            cursor: pointer;
-            background: #00ff88;
-            border: none;
-            border-radius: 5px;
-        }
-
-        #gameover {
-            position: fixed;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            background: rgba(0,0,0,0.9);
-            display: none;
-            justify-content: center;
-            align-items: center;
-            flex-direction: column;
-            color: white;
-            z-index: 9999;
-        }
-    </style>
-</head>
-<body>
-
-    <div id="homescreen">
-        <h1 style="font-size: 60px;">Chess RPG</h1>
-        <input id="playername" placeholder="Enter your name">
-        <button onclick="startGame()">Play</button>
-    </div>
-
-    <div id="game-container">
-        <div id="board"></div>
-    </div>
-
-    <div id="hud">
-        <h1>Turn‑Based Chess RPG</h1>
-        <div>HP: <span id="hp">20</span></div>
-        <div>Attack: <span id="atk">5</span></div>
-        <div>Wave: <span id="wave">1</span></div>
-        <div>Shield Cooldown: <span id="scd">0</span></div>
-        <div>Turn: <span id="turn">Player</span></div>
-        <p>Controls: W/A/S/D move, O shoot (once per turn), P block</p>
-        <div id="log"></div>
-    </div>
-
-    <div id="gameover">
-        <h1 style="font-size: 80px; margin: 0;">CHECKMATE</h1>
-        <p style="font-size: 24px; opacity: 0.8;">You have been defeated.</p>
-    </div>
-
-    <script>
-        const boardEl = document.getElementById("board");
-        const hpEl = document.getElementById("hp");
-        const atkEl = document.getElementById("atk");
-        const waveEl = document.getElementById("wave");
-        const scdEl = document.getElementById("scd");
-        const turnEl = document.getElementById("turn");
-        const logEl = document.getElementById("log");
-
-        let playerName = "Player";
-        let enemyName = "Enemy";
-
-        const BOARD_SIZE = 8;
-
-        let player = { x: 0, y: 7, hp: 20, atk: 5, shield: false, shieldCooldown: 0 };
-        let enemy = null;
-        let wave = 1;
-
-        let tiles = [];
-        let playerTurn = true;
-        let hasShotThisTurn = false;
-
-        for (let y = 0; y < BOARD_SIZE; y++) {
-            for (let x = 0; x < BOARD_SIZE; x++) {
-                const tile = document.createElement("div");
-                tile.classList.add("tile");
-                tile.classList.add((x + y) % 2 === 0 ? "light" : "dark");
-                tile.dataset.x = x;
-                tile.dataset.y = y;
-                boardEl.appendChild(tile);
-                tiles.push(tile);
-            }
-        }
-
-        function getTile(x, y) {
-            return tiles.find(t => Number(t.dataset.x) === x && Number(t.dataset.y) === y);
-        }
-
-        function log(msg) {
-            const p = document.createElement("p");
-            p.textContent = msg;
-            logEl.appendChild(p);
-            logEl.scrollTop = logEl.scrollHeight;
-        }
-
-        function render() {
-            tiles.forEach(t => t.innerHTML = "");
-
-            const pTile = getTile(player.x, player.y);
-            const pDiv = document.createElement("div");
-            pDiv.classList.add("player");
-
-            const pName = document.createElement("div");
-            pName.classList.add("nametag");
-            pName.textContent = playerName;
-
-            pTile.appendChild(pDiv);
-            pTile.appendChild(pName);
-
-            if (player.shield) {
-                const shield = document.createElement("div");
-                shield.classList.add("shield");
-                pTile.appendChild(shield);
-            }
-
-            if (enemy && enemy.hp > 0) {
-                const eTile = getTile(enemy.x, enemy.y);
-                const eDiv = document.createElement("div");
-                eDiv.classList.add("enemy");
-
-                const eName = document.createElement("div");
-                eName.classList.add("nametag");
-                eName.textContent = enemyName;
-
-                eTile.appendChild(eDiv);
-                eTile.appendChild(eName);
-            }
-
-            hpEl.textContent = player.hp;
-            atkEl.textContent = player.atk;
-            waveEl.textContent = wave;
-            scdEl.textContent = player.shieldCooldown;
-            turnEl.textContent = playerTurn ? "Player" : "Enemy";
-        }
-
-        function startGame() {
-            const nameInput = document.getElementById("playername").value.trim();
-            if (nameInput.length > 0) playerName = nameInput;
-
-            document.getElementById("homescreen").style.display = "none";
-
-            spawnEnemy();
-            render();
-            log("Welcome, " + playerName + "! Your turn.");
-        }
-
-        function gameOver() {
-            const screen = document.getElementById("gameover");
-            screen.style.display = "flex";
-            playerTurn = false;
-            document.body.style.pointerEvents = "none";
-            log("GAME OVER");
-        }
-
-        function spawnEnemy() {
-            wave++;
-            waveEl.textContent = wave;
-
-            const heal = Math.floor(player.hp * 0.1);
-            player.hp += heal;
-            log("You heal " + heal + " HP for the new wave!");
-
-            let ex, ey;
-            do {
-                ex = Math.floor(Math.random() * BOARD_SIZE);
-                ey = Math.floor(Math.random() * BOARD_SIZE);
-            } while (ex === player.x && ey === player.y);
-
-            enemyName = "Enemy " + wave;
-
-            enemy = {
-                x: ex,
-                y: ey,
-                hp: 10 + wave * 2,
-                atk: 3 + Math.floor(wave / 2)
-            };
-
-            log("Wave " + wave + " begins! " + enemyName + " appears.");
-            render();
-        }
-
-        function findNextStep(startX, startY, targetX, targetY) {
-            const dirs = [
-                { dx: 1, dy: 0 },
-                { dx: -1, dy: 0 },
-                { dx: 0, dy: 1 },
-                { dx: 0, dy: -1 }
-            ];
-
-            const visited = Array.from({ length: BOARD_SIZE }, () =>
-                Array(BOARD_SIZE).fill(false)
-            );
-            const queue = [];
-            const parent = {};
-
-            function key(x, y) { return x + "," + y; }
-
-            queue.push({ x: startX, y: startY });
-            visited[startY][startX] = true;
-            parent[key(startX, startY)] = null;
-
-            while (queue.length > 0) {
-                const current = queue.shift();
-                if (current.x === targetX && current.y === targetY) break;
-
-                for (const d of dirs) {
-                    const nx = current.x + d.dx;
-                    const ny = current.y + d.dy;
-                    if (
-                        nx >= 0 && nx < BOARD_SIZE &&
-                        ny >= 0 && ny < BOARD_SIZE &&
-                        !visited[ny][nx]
-                    ) {
-                        visited[ny][nx] = true;
-                        parent[key(nx, ny)] = current;
-                        queue.push({ x: nx, y: ny });
-                    }
-                }
-            }
-
-            const targetKey = key(targetX, targetY);
-            if (!parent[targetKey]) return { x: startX, y: startY };
-
-            let step = { x: targetX, y: targetY };
-            let prev = parent[key(step.x, step.y)];
-
-            while (prev && !(prev.x === startX && prev.y === startY)) {
-                step = prev;
-                prev = parent[key(step.x, step.y)];
-            }
-
-            return step;
-        }
-
-        function endPlayerTurn() {
-            playerTurn = false;
-            hasShotThisTurn = false;
-            document.body.style.pointerEvents = "none";
-            render();
-            setTimeout(enemyTurn, 600);
-        }
-
-        function enemyTurn() {
-            if (!enemy || enemy.hp <= 0) {
-                playerTurn = true;
-                document.body.style.pointerEvents = "auto";
-                render();
-                return;
-            }
-
-            if (Math.abs(enemy.x - player.x) + Math.abs(enemy.y - player.y) === 1) {
-                if (player.shield) {
-                    log(enemyName + " hits your shield!");
-                    player.shield = false;
-                    player.shieldCooldown = 3;
-                } else {
-                    player.hp -= enemy.atk;
-                    log(enemyName + " attacks you for " + enemy.atk + " damage!");
-
-                    if (player.hp <= 0) {
-                        log("You died.");
-                        gameOver();
-                        return;
-                    }
-                }
-
-                playerTurn = true;
-                document.body.style.pointerEvents = "auto";
-                render();
-                return;
-            }
-
-            const nextStep = findNextStep(enemy.x, enemy.y, player.x, player.y);
-            enemy.x = nextStep.x;
-            enemy.y = nextStep.y;
-            log(enemyName + " moves to " + enemy.x + "," + enemy.y);
-
-            playerTurn = true;
-            document.body.style.pointerEvents = "auto";
-            render();
-        }
-
-        function movePlayer(dx, dy) {
-            if (!playerTurn) return;
-
-            const nx = player.x + dx;
-            const ny = player.y + dy;
-
-            if (nx < 0 || nx >= BOARD_SIZE || ny < 0 || ny >= BOARD_SIZE) {
-                log("Can't move off board.");
-                return;
-            }
-
-            render(); // ensure player exists
-
-            const startTile = getTile(player.x, player.y);
-            const endTile = getTile(nx, ny);
-
-            const playerDiv = startTile.querySelector(".player");
-            const nameTag = startTile.querySelector(".nametag");
-
-            if (!playerDiv || !nameTag) {
-                // fallback
-                player.x = nx;
-                player.y = ny;
-                if (player.shieldCooldown > 0) player.shieldCooldown--;
-                log(playerName + " moves to " + nx + "," + ny);
-                endPlayerTurn();
-                return;
-            }
-
-            const startRect = startTile.getBoundingClientRect();
-            const endRect = endTile.getBoundingClientRect();
-
-            const dxPixels = endRect.left - startRect.left;
-            const dyPixels = endRect.top - startRect.top;
-
-            playerDiv.style.transition = "transform 0.25s linear";
-            nameTag.style.transition = "transform 0.25s linear";
-
-            playerDiv.style.transform = `translate(${dxPixels}px, ${dyPixels}px)`;
-            nameTag.style.transform = `translate(${dxPixels}px, ${dyPixels}px)`;
-
-            setTimeout(() => {
-                playerDiv.style.transition = "";
-                nameTag.style.transition = "";
-                playerDiv.style.transform = "";
-                nameTag.style.transform = "";
-
-                player.x = nx;
-                player.y = ny;
-
-                if (player.shieldCooldown > 0) player.shieldCooldown--;
-
-                log(playerName + " moves to " + nx + "," + ny);
-                render();
-                endPlayerTurn();
-            }, 250);
-        }
-
-        function block() {
-            if (!playerTurn) return;
-
-            if (player.shieldCooldown > 0) {
-                log("Shield on cooldown!");
-                return;
-            }
-
-            player.shield = true;
-            log(playerName + " raises their shield!");
-
-            render();
-        }
-
-        function shoot() {
-            if (!playerTurn) return;
-            if (hasShotThisTurn) {
-                log("You already shot this turn.");
-                return;
-            }
-            if (!enemy || enemy.hp <= 0) {
-                log("No enemy to shoot.");
-                return;
-            }
-
-            const dx = enemy.x - player.x;
-            const dy = enemy.y - player.y;
-
-            if (dx !== 0 && dy !== 0) {
-                log("Enemy not in shooting direction.");
-                return;
-            }
-
-            if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
-                log("Enemy too far to shoot.");
-                return;
-            }
-
-            let dirX = 0, dirY = 0;
-
-            if (dx !== 0) dirX = dx > 0 ? 1 : -1;
-            else if (dy !== 0) dirY = dy > 0 ? 1 : -1;
-
-            hasShotThisTurn = true;
-            fireBullet(dirX, dirY);
-        }
-
-        function fireBullet(dx, dy) {
-            const bullet = document.createElement("div");
-            bullet.classList.add("bullet");
-
-            const tile = getTile(player.x, player.y);
-            tile.appendChild(bullet);
-
-            let bx = player.x;
-            let by = player.y;
-
-            function step() {
-                bx += dx;
-                by += dy;
-
-                if (bx < 0 || bx >= BOARD_SIZE || by < 0 || by >= BOARD_SIZE) {
-                    bullet.remove();
-                    render();
-                    return;
-                }
-
-                const newTile = getTile(bx, by);
-                newTile.appendChild(bullet);
-
-                if (enemy && bx === enemy.x && by === enemy.y) {
-                    enemy.hp -= player.atk;
-                    log(playerName + " shoots " + enemyName + "! HP: " + enemy.hp);
-                    bullet.remove();
-
-                    if (enemy.hp <= 0) {
-                        log(enemyName + " defeated!");
-                        enemy = null;
-                        spawnEnemy();
-                        render();
-                        return;
-                    }
-
-                    render();
-                    return;
-                }
-
-                requestAnimationFrame(step);
-            }
-
-            requestAnimationFrame(step);
-        }
-
-        document.addEventListener("keydown", e => {
-            if (!playerTurn) return;
-
-            if (e.key === "w") movePlayer(0, -1);
-            if (e.key === "s") movePlayer(0, 1);
-            if (e.key === "a") movePlayer(-1, 0);
-            if (e.key === "d") movePlayer(1, 0);
-
-            if (e.key === "o") shoot();
-            if (e.key === "p") block();
-        });
-    </script>
-
-</body>
-</html>
+function movePlayer(dx, dy) {
+    if (!playerTurn) return;
+
+    const nx = player.x + dx;
+    const ny = player.y + dy;
+
+    if (nx < 0 || nx >= BOARD_SIZE || ny < 0 || ny >= BOARD_SIZE) {
+        log("Can't move off board.");
+        return;
+    }
+
+    render(); // ensure player exists
+
+    const startTile = getTile(player.x, player.y);
+    const endTile = getTile(nx, ny);
+
+    const playerDiv = startTile.querySelector(".player");
+    const nameTag = startTile.querySelector(".nametag");
+
+    if (!playerDiv || !nameTag) {
+        // fallback
+        player.x = nx;
+        player.y = ny;
+        if (player.shieldCooldown > 0) player.shieldCooldown--;
+        log(playerName + " moves to " + nx + "," + ny);
+        endPlayerTurn();
+        return;
+    }
+
+    // Get center positions of tiles
+    const startRect = startTile.getBoundingClientRect();
+    const endRect = endTile.getBoundingClientRect();
+
+    const startX = startRect.left + startRect.width / 2;
+    const startY = startRect.top + startRect.height / 2;
+
+    const endX = endRect.left + endRect.width / 2;
+    const endY = endRect.top + endRect.height / 2;
+
+    const dxPixels = endX - startX;
+    const dyPixels = endY - startY;
+
+    // Animate real player
+    playerDiv.style.transition = "transform 0.25s linear";
+    nameTag.style.transition = "transform 0.25s linear";
+
+    playerDiv.style.transform = `translate(${dxPixels}px, ${dyPixels}px)`;
+    nameTag.style.transform = `translate(${dxPixels}px, ${dyPixels}px)`;
+
+    setTimeout(() => {
+        // Reset transform and move to new tile
+        playerDiv.style.transition = "";
+        nameTag.style.transition = "";
+        playerDiv.style.transform = "";
+        nameTag.style.transform = "";
+
+        player.x = nx;
+        player.y = ny;
+
+        if (player.shieldCooldown > 0) player.shieldCooldown--;
+
+        log(playerName + " moves to " + nx + "," + ny);
+        render();
+        endPlayerTurn();
+    }, 250);
+}

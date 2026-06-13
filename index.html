@@ -81,11 +81,6 @@
             z-index: 999;
         }
 
-        .enemybullet {
-            background: #ff4444;
-            box-shadow: 0 0 12px 6px #ff4444;
-        }
-
         #hud {
             flex: 1;
             padding: 20px;
@@ -165,7 +160,7 @@
         <div>Wave: <span id="wave">1</span></div>
         <div>Shield Cooldown: <span id="scd">0</span></div>
         <div>Turn: <span id="turn">Player</span></div>
-        <p>Controls: W/A/S/D move, O shoot (once per turn, free), P block</p>
+        <p>Controls: W/A/S/D move, O shoot (once per turn), P block</p>
         <div id="log"></div>
     </div>
 
@@ -360,12 +355,10 @@
 
         function endPlayerTurn() {
             playerTurn = false;
+            hasShotThisTurn = false;
             document.body.style.pointerEvents = "none";
             render();
-            setTimeout(() => {
-                hasShotThisTurn = false; // reset for next turn
-                enemyTurn();
-            }, 600);
+            setTimeout(enemyTurn, 600);
         }
 
         function enemyTurn() {
@@ -419,48 +412,51 @@
                 return;
             }
 
-            // Render current state so .player exists
-            render();
+            render(); // ensure player is drawn
 
             const startTile = getTile(player.x, player.y);
             const endTile = getTile(nx, ny);
 
             const playerDiv = startTile.querySelector(".player");
-            if (!playerDiv) {
-                // fallback: no animation
-                player.x = nx;
-                player.y = ny;
-                if (player.shieldCooldown > 0) player.shieldCooldown--;
-                log(playerName + " moves to " + nx + "," + ny);
-                endPlayerTurn();
-                return;
-            }
+            const nameTag = startTile.querySelector(".nametag");
+
+            // Remove real player from board
+            startTile.innerHTML = "";
 
             const startRect = startTile.getBoundingClientRect();
             const endRect = endTile.getBoundingClientRect();
 
-            const clone = playerDiv.cloneNode(true);
-            clone.style.position = "fixed";
-            clone.style.left = startRect.left + "px";
-            clone.style.top = startRect.top + "px";
-            clone.style.transition = "0.25s linear";
-            clone.style.zIndex = 9999;
+            const container = document.createElement("div");
+            container.style.position = "fixed";
+            container.style.left = startRect.left + "px";
+            container.style.top = startRect.top + "px";
+            container.style.width = playerDiv.offsetWidth + "px";
+            container.style.height = playerDiv.offsetHeight + "px";
+            container.style.transition = "0.25s linear";
+            container.style.zIndex = 9999;
 
-            document.body.appendChild(clone);
+            const clone = playerDiv.cloneNode(true);
+            const cloneName = nameTag.cloneNode(true);
+
+            container.appendChild(clone);
+            container.appendChild(cloneName);
+            document.body.appendChild(container);
 
             requestAnimationFrame(() => {
-                clone.style.left = endRect.left + "px";
-                clone.style.top = endRect.top + "px";
+                container.style.left = endRect.left + "px";
+                container.style.top = endRect.top + "px";
             });
 
             setTimeout(() => {
-                clone.remove();
+                container.remove();
+
                 player.x = nx;
                 player.y = ny;
 
                 if (player.shieldCooldown > 0) player.shieldCooldown--;
 
                 log(playerName + " moves to " + nx + "," + ny);
+                render();
                 endPlayerTurn();
             }, 250);
         }
@@ -507,10 +503,6 @@
 
             if (dx !== 0) dirX = dx > 0 ? 1 : -1;
             else if (dy !== 0) dirY = dy > 0 ? 1 : -1;
-            else {
-                log("Enemy is on your tile?!");
-                return;
-            }
 
             hasShotThisTurn = true;
             fireBullet(dirX, dirY);

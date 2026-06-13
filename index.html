@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Chess RPG - Third Person</title>
+    <title>Chess RPG - Turn Based</title>
     <style>
         body {
             margin: 0;
@@ -13,13 +13,12 @@
             height: 100vh;
         }
 
-        /* Left: game view */
         #game-container {
             flex: 3;
             display: flex;
             justify-content: center;
             align-items: center;
-            perspective: 800px; /* fake 3D */
+            perspective: 800px;
         }
 
         #board {
@@ -28,61 +27,34 @@
             display: grid;
             grid-template-columns: repeat(8, 1fr);
             grid-template-rows: repeat(8, 1fr);
-            transform: rotateX(60deg) translateY(40px); /* improved 3D look */
-            transform-origin: center;
+            transform: rotateX(60deg) translateY(40px);
         }
 
         .tile {
-            width: 100%;
-            height: 100%;
-            box-sizing: border-box;
             border: 1px solid #333;
             display: flex;
             justify-content: center;
             align-items: center;
-            font-size: 20px;
-            font-weight: bold;
         }
 
-        .dark {
-            background: #444;
-        }
+        .dark { background: #444; }
+        .light { background: #bbb; color: #000; }
 
-        .light {
-            background: #bbb;
-            color: #000;
-        }
-
-        .player {
+        .player, .enemy {
             width: 80%;
             height: 80%;
             border-radius: 50%;
-            background: #00ff88;
             border: 2px solid #fff;
         }
 
-        .enemy {
-            width: 80%;
-            height: 80%;
-            border-radius: 50%;
-            background: #ff4444;
-            border: 2px solid #fff;
-        }
+        .player { background: #00ff88; }
+        .enemy { background: #ff4444; }
 
-        /* Right: HUD / stats */
         #hud {
             flex: 1;
             padding: 20px;
             background: #181818;
             border-left: 2px solid #333;
-        }
-
-        #hud h1 {
-            margin-top: 0;
-        }
-
-        .stat {
-            margin: 10px 0;
         }
 
         #log {
@@ -103,11 +75,11 @@
     </div>
 
     <div id="hud">
-        <h1>Chess RPG</h1>
-        <div class="stat">HP: <span id="hp">20</span></div>
-        <div class="stat">Attack: <span id="atk">5</span></div>
-        <div class="stat">Position: <span id="pos">0,0</span></div>
-        <p>Controls: W/A/S/D to move (like a chess king), Space to attack.</p>
+        <h1>Turn‑Based Chess RPG</h1>
+        <div>HP: <span id="hp">20</span></div>
+        <div>Attack: <span id="atk">5</span></div>
+        <div>Turn: <span id="turn">Player</span></div>
+        <p>Controls: W/A/S/D to move, Space to attack (only on your turn)</p>
         <div id="log"></div>
     </div>
 
@@ -115,37 +87,23 @@
         const boardEl = document.getElementById("board");
         const hpEl = document.getElementById("hp");
         const atkEl = document.getElementById("atk");
-        const posEl = document.getElementById("pos");
+        const turnEl = document.getElementById("turn");
         const logEl = document.getElementById("log");
 
         const BOARD_SIZE = 8;
 
-        // Player stats
-        let player = {
-            x: 0,
-            y: 7, // bottom-left
-            hp: 20,
-            atk: 5
-        };
+        let player = { x: 0, y: 7, hp: 20, atk: 5 };
+        let enemy = { x: 4, y: 3, hp: 10, atk: 3 };
 
-        // Simple enemy
-        let enemy = {
-            x: 4,
-            y: 3,
-            hp: 10
-        };
-
-        // Create board tiles
         let tiles = [];
+        let playerTurn = true;
+
+        // Create board
         for (let y = 0; y < BOARD_SIZE; y++) {
             for (let x = 0; x < BOARD_SIZE; x++) {
                 const tile = document.createElement("div");
                 tile.classList.add("tile");
-                if ((x + y) % 2 === 0) {
-                    tile.classList.add("light");
-                } else {
-                    tile.classList.add("dark");
-                }
+                tile.classList.add((x + y) % 2 === 0 ? "light" : "dark");
                 tile.dataset.x = x;
                 tile.dataset.y = y;
                 boardEl.appendChild(tile);
@@ -157,70 +115,107 @@
             return tiles.find(t => Number(t.dataset.x) === x && Number(t.dataset.y) === y);
         }
 
-        function render() {
-            // Clear pieces
-            tiles.forEach(t => {
-                t.innerHTML = "";
-            });
-
-            // Draw player
-            const playerTile = getTile(player.x, player.y);
-            const playerDiv = document.createElement("div");
-            playerDiv.classList.add("player");
-            playerTile.appendChild(playerDiv);
-
-            // Draw enemy if alive
-            if (enemy.hp > 0) {
-                const enemyTile = getTile(enemy.x, enemy.y);
-                const enemyDiv = document.createElement("div");
-                enemyDiv.classList.add("enemy");
-                enemyTile.appendChild(enemyDiv);
-            }
-
-            // Update HUD
-            hpEl.textContent = player.hp;
-            atkEl.textContent = player.atk;
-            posEl.textContent = player.x + "," + player.y;
-        }
-
-        function log(message) {
+        function log(msg) {
             const p = document.createElement("p");
-            p.textContent = message;
+            p.textContent = msg;
             logEl.appendChild(p);
             logEl.scrollTop = logEl.scrollHeight;
         }
 
-        function movePlayer(dx, dy) {
-            const newX = player.x + dx;
-            const newY = player.y + dy;
+        function render() {
+            tiles.forEach(t => t.innerHTML = "");
 
-            // Stay on board
-            if (newX < 0 || newX >= BOARD_SIZE || newY < 0 || newY >= BOARD_SIZE) {
-                log("You can't move off the board.");
+            const pTile = getTile(player.x, player.y);
+            const pDiv = document.createElement("div");
+            pDiv.classList.add("player");
+            pTile.appendChild(pDiv);
+
+            if (enemy.hp > 0) {
+                const eTile = getTile(enemy.x, enemy.y);
+                const eDiv = document.createElement("div");
+                eDiv.classList.add("enemy");
+                eTile.appendChild(eDiv);
+            }
+
+            hpEl.textContent = player.hp;
+            atkEl.textContent = player.atk;
+            turnEl.textContent = playerTurn ? "Player" : "Enemy";
+        }
+
+        function endPlayerTurn() {
+            playerTurn = false;
+            render();
+            setTimeout(enemyTurn, 600);
+        }
+
+        function enemyTurn() {
+            if (enemy.hp <= 0) {
+                log("Enemy is dead.");
+                playerTurn = true;
+                render();
                 return;
             }
 
-            player.x = newX;
-            player.y = newY;
-            log("You moved to " + newX + "," + newY);
+            // If next to player, attack
+            if (Math.abs(enemy.x - player.x) + Math.abs(enemy.y - player.y) === 1) {
+                player.hp -= enemy.atk;
+                log("Enemy attacks you for " + enemy.atk + " damage!");
+                if (player.hp <= 0) {
+                    log("You died. Game over.");
+                }
+                playerTurn = true;
+                render();
+                return;
+            }
+
+            // Move enemy toward player
+            if (enemy.x < player.x) enemy.x++;
+            else if (enemy.x > player.x) enemy.x--;
+
+            if (enemy.y < player.y) enemy.y++;
+            else if (enemy.y > player.y) enemy.y--;
+
+            log("Enemy moves to " + enemy.x + "," + enemy.y);
+
+            playerTurn = true;
             render();
+        }
+
+        function movePlayer(dx, dy) {
+            if (!playerTurn) return;
+
+            const nx = player.x + dx;
+            const ny = player.y + dy;
+
+            if (nx < 0 || nx >= BOARD_SIZE || ny < 0 || ny >= BOARD_SIZE) {
+                log("Can't move off board.");
+                return;
+            }
+
+            player.x = nx;
+            player.y = ny;
+            log("You move to " + nx + "," + ny);
+
+            endPlayerTurn();
         }
 
         function attack() {
-            if (player.x === enemy.x && player.y === enemy.y && enemy.hp > 0) {
+            if (!playerTurn) return;
+
+            if (player.x === enemy.x && player.y === enemy.y) {
                 enemy.hp -= player.atk;
-                log("You attacked the enemy! Enemy HP: " + enemy.hp);
-                if (enemy.hp <= 0) {
-                    log("Enemy defeated!");
-                }
+                log("You hit the enemy! Enemy HP: " + enemy.hp);
+                if (enemy.hp <= 0) log("Enemy defeated!");
             } else {
-                log("No enemy on this tile.");
+                log("No enemy here.");
             }
-            render();
+
+            endPlayerTurn();
         }
 
-        // Keyboard controls: W/A/S/D + Space
-        document.addEventListener("keydown", (e) => {
+        document.addEventListener("keydown", e => {
+            if (!playerTurn) return;
+
             if (e.key === "w") movePlayer(0, -1);
             if (e.key === "s") movePlayer(0, 1);
             if (e.key === "a") movePlayer(-1, 0);
@@ -228,9 +223,8 @@
             if (e.key === " ") attack();
         });
 
-        // Initial render
         render();
-        log("Welcome to Chess RPG. Move to the red enemy and press Space to attack.");
+        log("Game start! Your turn.");
     </script>
 
 </body>

@@ -1,487 +1,77 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Chess RPG 3D</title>
-
-    <!-- Three.js -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r152/three.min.js"></script>
-
-    <style>
-        body {
-            margin: 0;
-            background: #111;
-            color: #fff;
-            font-family: Arial, sans-serif;
-            display: flex;
-            flex-direction: row;
-            height: 100vh;
-            overflow: hidden;
-        }
-
-        #game-container {
-            flex: 3;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            background: #000;
-        }
-
-        #hud {
-            flex: 1;
-            padding: 20px;
-            background: #181818;
-            border-left: 2px solid #333;
-        }
-
-        #log {
-            margin-top: 20px;
-            height: 200px;
-            overflow-y: auto;
-            border: 1px solid #333;
-            padding: 10px;
-            background: #101010;
-            font-size: 14px;
-        }
-
-        #homescreen {
-            position: fixed;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            background: rgba(0,0,0,0.95);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            flex-direction: column;
-            z-index: 999999;
-        }
-
-        #homescreen input {
-            padding: 10px;
-            font-size: 20px;
-            margin-bottom: 20px;
-            width: 250px;
-            text-align: center;
-        }
-
-        #homescreen button {
-            padding: 10px 20px;
-            font-size: 22px;
-            cursor: pointer;
-            background: #00ff88;
-            border: none;
-            border-radius: 5px;
-        }
-
-        #gameover {
-            position: fixed;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            background: rgba(0,0,0,0.9);
-            display: none;
-            justify-content: center;
-            align-items: center;
-            flex-direction: column;
-            color: white;
-            z-index: 9999;
-        }
-    </style>
-</head>
-<body>
-
-    <!-- HOME SCREEN -->
-    <div id="homescreen">
-        <h1 style="font-size: 60px;">Chess RPG 3D</h1>
-        <input id="playername" placeholder="Enter your name">
-        <button id="playbutton">Play</button>
-    </div>
-
-    <!-- 3D GAME AREA -->
-    <div id="game-container"></div>
-
-    <!-- HUD -->
-    <div id="hud">
-        <h1>Turn‑Based Chess RPG</h1>
-        <div>HP: <span id="hp">20</span></div>
-        <div>Attack: <span id="atk">5</span></div>
-        <div>Wave: <span id="wave">1</span></div>
-        <div>Shield Cooldown: <span id="scd">0</span></div>
-        <div>Turn: <span id="turn">Player</span></div>
-        <p>Controls: W/A/S/D move, O shoot, P block</p>
-        <div id="log"></div>
-    </div>
-
-    <!-- GAME OVER -->
-    <div id="gameover">
-        <h1 style="font-size: 80px; margin: 0;">CHECKMATE</h1>
-        <p style="font-size: 24px; opacity: 0.8;">You have been defeated.</p>
-    </div>
-
-    <script>
-        /* --------------------------- */
-        /*        GAME VARIABLES       */
-        /* --------------------------- */
-
-        const hpEl = document.getElementById("hp");
-        const atkEl = document.getElementById("atk");
-        const waveEl = document.getElementById("wave");
-        const scdEl = document.getElementById("scd");
-        const turnEl = document.getElementById("turn");
-        const logEl = document.getElementById("log");
-
-        let playerName = "Player";
-        let enemyName = "Enemy";
-
-        const BOARD_SIZE = 8; // change to 64 if you want huge board
-
-        let player = { x: 0, y: 7, hp: 20, atk: 5, shield: false, shieldCooldown: 0 };
-        let enemy = null;
-        let wave = 1;
-
-        let playerTurn = true;
-        let hasShotThisTurn = false;
-
-        /* --------------------------- */
-        /*        LOG FUNCTION         */
-        /* --------------------------- */
-
-        function log(msg) {
-            const p = document.createElement("p");
-            p.textContent = msg;
-            logEl.appendChild(p);
-            logEl.scrollTop = logEl.scrollHeight;
-        }
-
-        /* --------------------------- */
-        /*        RENDER FUNCTION      */
-        /* --------------------------- */
-
-        function render() {
-            hpEl.textContent = player.hp;
-            atkEl.textContent = player.atk;
-            waveEl.textContent = wave;
-            scdEl.textContent = player.shieldCooldown;
-            turnEl.textContent = playerTurn ? "Player" : "Enemy";
-
-            // sync 3D if available
-            if (typeof player3D !== "undefined") {
-                player3D.position.set(player.x, 0.2, player.y);
-            }
-            if (typeof enemy3D !== "undefined") {
-                if (enemy && enemy.hp > 0) {
-                    enemy3D.visible = true;
-                    enemy3D.position.set(enemy.x, 0.2, enemy.y);
-                } else {
-                    enemy3D.visible = false;
-                }
-            }
-        }
-
-        /* --------------------------- */
-        /*        START GAME           */
-        /* --------------------------- */
-
-        document.getElementById("playbutton").addEventListener("click", startGame);
-
-        function startGame() {
-            const nameInput = document.getElementById("playername").value.trim();
-            if (nameInput.length > 0) playerName = nameInput;
-
-            document.getElementById("homescreen").style.display = "none";
-
-            spawnEnemy();
-            render();
-            log("Welcome, " + playerName + "! Your turn.");
-        }
-
-        /* --------------------------- */
-        /*        GAME OVER            */
-        /* --------------------------- */
-
-        function gameOver() {
-            const screen = document.getElementById("gameover");
-            screen.style.display = "flex";
-            playerTurn = false;
-            document.body.style.pointerEvents = "none";
-            log("GAME OVER");
-        }
-
-        /* --------------------------- */
-        /*        SPAWN ENEMY          */
-        /* --------------------------- */
-
-        function spawnEnemy() {
-            wave++;
-            waveEl.textContent = wave;
-
-            const heal = Math.floor(player.hp * 0.1);
-            player.hp += heal;
-            log("You heal " + heal + " HP for the new wave!");
-
-            let ex, ey;
-            do {
-                ex = Math.floor(Math.random() * BOARD_SIZE);
-                ey = Math.floor(Math.random() * BOARD_SIZE);
-            } while (ex === player.x && ey === player.y);
-
-            enemyName = "Enemy " + wave;
-
-            enemy = {
-                x: ex,
-                y: ey,
-                hp: 10 + wave * 2,
-                atk: 3 + Math.floor(wave / 2)
-            };
-
-            log("Wave " + wave + " begins! " + enemyName + " appears.");
-            render();
-        }
-
-        /* --------------------------- */
-        /*        PATHFINDING          */
-        /* --------------------------- */
-
-        function findNextStep(startX, startY, targetX, targetY) {
-            const dirs = [
-                { dx: 1, dy: 0 },
-                { dx: -1, dy: 0 },
-                { dx: 0, dy: 1 },
-                { dx: 0, dy: -1 }
-            ];
-
-            const visited = Array.from({ length: BOARD_SIZE }, () =>
-                Array(BOARD_SIZE).fill(false)
-            );
-            const queue = [];
-            const parent = {};
-
-            function key(x, y) { return x + "," + y; }
-
-            queue.push({ x: startX, y: startY });
-            visited[startY][startX] = true;
-            parent[key(startX, startY)] = null;
-
-            while (queue.length > 0) {
-                const current = queue.shift();
-                if (current.x === targetX && current.y === targetY) break;
-
-                for (const d of dirs) {
-                    const nx = current.x + d.dx;
-                    const ny = current.y + d.dy;
-                    if (
-                        nx >= 0 && nx < BOARD_SIZE &&
-                        ny >= 0 && ny < BOARD_SIZE &&
-                        !visited[ny][nx]
-                    ) {
-                        visited[ny][nx] = true;
-                        parent[key(nx, ny)] = current;
-                        queue.push({ x: nx, y: ny });
-                    }
-                }
-            }
-
-            const targetKey = key(targetX, targetY);
-            if (!parent[targetKey]) return { x: startX, y: startY };
-
-            let step = { x: targetX, y: targetY };
-            let prev = parent[key(step.x, step.y)];
-
-            while (prev && !(prev.x === startX && prev.y === startY)) {
-                step = prev;
-                prev = parent[key(step.x, step.y)];
-            }
-
-            return step;
-        }
-
-        /* --------------------------- */
-        /*        TURN SYSTEM          */
-        /* --------------------------- */
-
-        function endPlayerTurn() {
-            playerTurn = false;
-            hasShotThisTurn = false;
-            document.body.style.pointerEvents = "none";
-            render();
-            setTimeout(enemyTurn, 600);
-        }
-
-        function enemyTurn() {
-            if (!enemy || enemy.hp <= 0) {
-                playerTurn = true;
-                document.body.style.pointerEvents = "auto";
-                render();
-                return;
-            }
-
-            if (Math.abs(enemy.x - player.x) + Math.abs(enemy.y - player.y) === 1) {
-                if (player.shield) {
-                    log(enemyName + " hits your shield!");
-                    player.shield = false;
-                    player.shieldCooldown = 3;
-                } else {
-                    player.hp -= enemy.atk;
-                    log(enemyName + " attacks you for " + enemy.atk + " damage!");
-
-                    if (player.hp <= 0) {
-                        log("You died.");
-                        gameOver();
-                        return;
-                    }
-                }
-
-                playerTurn = true;
-                document.body.style.pointerEvents = "auto";
-                render();
-                return;
-            }
-
-            const nextStep = findNextStep(enemy.x, enemy.y, player.x, player.y);
-            enemy.x = nextStep.x;
-            enemy.y = nextStep.y;
-            log(enemyName + " moves to " + enemy.x + "," + enemy.y);
-
-            playerTurn = true;
-            document.body.style.pointerEvents = "auto";
-            render();
-        }
-
-        /* --------------------------- */
-        /*        MOVEMENT             */
-        /* --------------------------- */
-
-        function movePlayer(dx, dy) {
-            if (!playerTurn) return;
-
-            const nx = player.x + dx;
-            const ny = player.y + dy;
-
-            if (nx < 0 || nx >= BOARD_SIZE || ny < 0 || ny >= BOARD_SIZE) {
-                log("Can't move off board.");
-                return;
-            }
-
-            player.x = nx;
-            player.y = ny;
-
-            if (player.shieldCooldown > 0) player.shieldCooldown--;
-
-            log(playerName + " moves to " + nx + "," + ny);
-            render();
-            endPlayerTurn();
-        }
-
-        /* --------------------------- */
-        /*        BLOCK ACTION         */
-        /* --------------------------- */
-
-        function block() {
-            if (!playerTurn) return;
-
-            if (player.shieldCooldown > 0) {
-                log("Shield on cooldown!");
-                return;
-            }
-
-            player.shield = true;
-            log(playerName + " raises their shield!");
-
-            render();
-        }
-
-        /* --------------------------- */
-        /*        SHOOTING             */
-        /* --------------------------- */
-
-        function shoot() {
-            if (!playerTurn) return;
-            if (hasShotThisTurn) {
-                log("You already shot this turn.");
-                return;
-            }
-            if (!enemy || enemy.hp <= 0) {
-                log("No enemy to shoot.");
-                return;
-            }
-
-            const dx = enemy.x - player.x;
-            const dy = enemy.y - player.y;
-
-            if (dx !== 0 && dy !== 0) {
-                log("Enemy not in shooting direction.");
-                return;
-            }
-
-            if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
-                log("Enemy too far to shoot.");
-                return;
-            }
-
-            let dirX = 0, dirY = 0;
-
-            if (dx !== 0) dirX = dx > 0 ? 1 : -1;
-            else if (dy !== 0) dirY = dy > 0 ? 1 : -1;
-
-            hasShotThisTurn = true;
-            fireBullet(dirX, dirY);
-        }
-
-        /* --------------------------- */
-        /*        BULLET SYSTEM        */
-        /* --------------------------- */
-
-        function fireBullet(dx, dy) {
-            let bx = player.x;
-            let by = player.y;
-
-            function step() {
-                bx += dx;
-                by += dy;
-
-                if (bx < 0 || bx >= BOARD_SIZE || by < 0 || by >= BOARD_SIZE) {
-                    render();
-                    return;
-                }
-
-                if (enemy && bx === enemy.x && by === enemy.y) {
-                    enemy.hp -= player.atk;
-                    log(playerName + " shoots " + enemyName + "! HP: " + enemy.hp);
-
-                    if (enemy.hp <= 0) {
-                        log(enemyName + " defeated!");
-                        enemy = null;
-                        spawnEnemy();
-                        render();
-                        return;
-                    }
-
-                    render();
-                    return;
-                }
-
-                requestAnimationFrame(step);
-            }
-
-            requestAnimationFrame(step);
-        }
-
-        /* --------------------------- */
-        /*        KEYBOARD INPUT       */
-        /* --------------------------- */
-
-        document.addEventListener("keydown", e => {
-            if (!playerTurn) return;
-
-            if (e.key === "w") movePlayer(0, -1);
-            if (e.key === "s") movePlayer(0, 1);
-            if (e.key === "a") movePlayer(-1, 0);
-            if (e.key === "d") movePlayer(1, 0);
-
-            if (e.key === "o") shoot();
-            if (e.key === "p") block();
-        });
-    </script>
-
-    <!-- 3D RENDERING FILE -->
-    <script src="game3d.js"></script>
-</body>
-</html>
+// THREE.JS SETUP
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(
+    60,
+    (window.innerWidth * 0.75) / window.innerHeight,
+    0.1,
+    1000
+);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth * 0.75, window.innerHeight);
+document.getElementById("game-container").appendChild(renderer.domElement);
+
+// Camera position
+camera.position.set(10, 15, 20);
+camera.lookAt(BOARD_SIZE / 2, 0, BOARD_SIZE / 2);
+
+// Lighting
+const light = new THREE.DirectionalLight(0xffffff, 1);
+light.position.set(20, 50, 20);
+scene.add(light);
+
+const ambient = new THREE.AmbientLight(0x404040);
+scene.add(ambient);
+
+// 3D BOARD
+const tileSize = 1;
+const boardGroup = new THREE.Group();
+
+for (let x = 0; x < BOARD_SIZE; x++) {
+    for (let y = 0; y < BOARD_SIZE; y++) {
+        const color = (x + y) % 2 === 0 ? 0xffffff : 0x444444;
+        const tileGeo = new THREE.BoxGeometry(tileSize, 0.2, tileSize);
+        const tileMat = new THREE.MeshPhongMaterial({ color });
+        const tile = new THREE.Mesh(tileGeo, tileMat);
+
+        tile.position.set(x * tileSize, 0, y * tileSize);
+        boardGroup.add(tile);
+    }
+}
+
+boardGroup.position.set(0, 0, 0);
+scene.add(boardGroup);
+
+// PAWN CREATOR
+function createPawn(color) {
+    const group = new THREE.Group();
+
+    const baseGeo = new THREE.CylinderGeometry(0.4, 0.6, 0.4, 16);
+    const baseMat = new THREE.MeshPhongMaterial({ color });
+    const base = new THREE.Mesh(baseGeo, baseMat);
+    group.add(base);
+
+    const bodyGeo = new THREE.CylinderGeometry(0.3, 0.3, 0.8, 16);
+    const body = new THREE.Mesh(bodyGeo, baseMat);
+    body.position.y = 0.6;
+    group.add(body);
+
+    const headGeo = new THREE.SphereGeometry(0.25, 16, 16);
+    const head = new THREE.Mesh(headGeo, baseMat);
+    head.position.y = 1.2;
+    group.add(head);
+
+    return group;
+}
+
+const player3D = createPawn(0xffffff);
+scene.add(player3D);
+
+const enemy3D = createPawn(0x000000);
+scene.add(enemy3D);
+
+// ANIMATION LOOP
+function animate() {
+    requestAnimationFrame(animate);
+    renderer.render(scene, camera);
+}
+animate();

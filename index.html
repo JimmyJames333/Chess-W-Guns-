@@ -23,8 +23,8 @@
         }
 
         #board {
-            width: 480px;
-            height: 480px;
+            width: 960px;
+            height: 960px;
             display: grid;
             grid-template-columns: repeat(8, 1fr);
             grid-template-rows: repeat(8, 1fr);
@@ -243,7 +243,7 @@
         let playerName = "Player";
         let enemyName = "Enemy";
 
-        const BOARD_SIZE = 8;
+        const BOARD_SIZE = 64;
 
         let player = { x: 0, y: 7, hp: 20, atk: 5, shield: false, shieldCooldown: 0 };
         let enemy = null;

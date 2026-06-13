@@ -412,7 +412,7 @@
                 return;
             }
 
-            render(); // ensure player is drawn
+            render(); // ensure player exists
 
             const startTile = getTile(player.x, player.y);
             const endTile = getTile(nx, ny);
@@ -420,35 +420,33 @@
             const playerDiv = startTile.querySelector(".player");
             const nameTag = startTile.querySelector(".nametag");
 
-            // Remove real player from board
-            startTile.innerHTML = "";
+            if (!playerDiv || !nameTag) {
+                // fallback
+                player.x = nx;
+                player.y = ny;
+                if (player.shieldCooldown > 0) player.shieldCooldown--;
+                log(playerName + " moves to " + nx + "," + ny);
+                endPlayerTurn();
+                return;
+            }
 
             const startRect = startTile.getBoundingClientRect();
             const endRect = endTile.getBoundingClientRect();
 
-            const container = document.createElement("div");
-            container.style.position = "fixed";
-            container.style.left = startRect.left + "px";
-            container.style.top = startRect.top + "px";
-            container.style.width = playerDiv.offsetWidth + "px";
-            container.style.height = playerDiv.offsetHeight + "px";
-            container.style.transition = "0.25s linear";
-            container.style.zIndex = 9999;
+            const dxPixels = endRect.left - startRect.left;
+            const dyPixels = endRect.top - startRect.top;
 
-            const clone = playerDiv.cloneNode(true);
-            const cloneName = nameTag.cloneNode(true);
+            playerDiv.style.transition = "transform 0.25s linear";
+            nameTag.style.transition = "transform 0.25s linear";
 
-            container.appendChild(clone);
-            container.appendChild(cloneName);
-            document.body.appendChild(container);
-
-            requestAnimationFrame(() => {
-                container.style.left = endRect.left + "px";
-                container.style.top = endRect.top + "px";
-            });
+            playerDiv.style.transform = `translate(${dxPixels}px, ${dyPixels}px)`;
+            nameTag.style.transform = `translate(${dxPixels}px, ${dyPixels}px)`;
 
             setTimeout(() => {
-                container.remove();
+                playerDiv.style.transition = "";
+                nameTag.style.transition = "";
+                playerDiv.style.transform = "";
+                nameTag.style.transform = "";
 
                 player.x = nx;
                 player.y = ny;

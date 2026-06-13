@@ -165,7 +165,7 @@
         <div>Wave: <span id="wave">1</span></div>
         <div>Shield Cooldown: <span id="scd">0</span></div>
         <div>Turn: <span id="turn">Player</span></div>
-        <p>Controls: W/A/S/D move, O shoot, P block</p>
+        <p>Controls: W/A/S/D move, O shoot (free), P block</p>
         <div id="log"></div>
     </div>
 
@@ -415,13 +415,49 @@
                 return;
             }
 
-            player.x = nx;
-            player.y = ny;
-            log(playerName + " moves to " + nx + "," + ny);
+            render(); // ensure DOM has current player
 
-            if (player.shieldCooldown > 0) player.shieldCooldown--;
+            const startTile = getTile(player.x, player.y);
+            const endTile = getTile(nx, ny);
 
-            endPlayerTurn();
+            const playerDiv = startTile.querySelector(".player");
+            if (!playerDiv) {
+                // fallback: no animation, just move
+                player.x = nx;
+                player.y = ny;
+                if (player.shieldCooldown > 0) player.shieldCooldown--;
+                log(playerName + " moves to " + nx + "," + ny);
+                endPlayerTurn();
+                return;
+            }
+
+            const startRect = startTile.getBoundingClientRect();
+            const endRect = endTile.getBoundingClientRect();
+
+            const clone = playerDiv.cloneNode(true);
+            clone.style.position = "fixed";
+            clone.style.left = startRect.left + "px";
+            clone.style.top = startRect.top + "px";
+            clone.style.transition = "0.25s linear";
+            clone.style.zIndex = 9999;
+
+            document.body.appendChild(clone);
+
+            requestAnimationFrame(() => {
+                clone.style.left = endRect.left + "px";
+                clone.style.top = endRect.top + "px";
+            });
+
+            setTimeout(() => {
+                clone.remove();
+                player.x = nx;
+                player.y = ny;
+
+                if (player.shieldCooldown > 0) player.shieldCooldown--;
+
+                log(playerName + " moves to " + nx + "," + ny);
+                endPlayerTurn();
+            }, 250);
         }
 
         function block() {
@@ -486,7 +522,7 @@
 
                 if (bx < 0 || bx >= BOARD_SIZE || by < 0 || by >= BOARD_SIZE) {
                     bullet.remove();
-                    endPlayerTurn();
+                    render();
                     return;
                 }
 
@@ -506,7 +542,7 @@
                         return;
                     }
 
-                    endPlayerTurn();
+                    render();
                     return;
                 }
 

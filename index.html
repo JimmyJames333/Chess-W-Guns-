@@ -165,7 +165,7 @@
         <div>Wave: <span id="wave">1</span></div>
         <div>Shield Cooldown: <span id="scd">0</span></div>
         <div>Turn: <span id="turn">Player</span></div>
-        <p>Controls: W/A/S/D move, O shoot (free), P block</p>
+        <p>Controls: W/A/S/D move, O shoot (once per turn, free), P block</p>
         <div id="log"></div>
     </div>
 
@@ -194,6 +194,7 @@
 
         let tiles = [];
         let playerTurn = true;
+        let hasShotThisTurn = false;
 
         for (let y = 0; y < BOARD_SIZE; y++) {
             for (let x = 0; x < BOARD_SIZE; x++) {
@@ -361,7 +362,10 @@
             playerTurn = false;
             document.body.style.pointerEvents = "none";
             render();
-            setTimeout(enemyTurn, 600);
+            setTimeout(() => {
+                hasShotThisTurn = false; // reset for next turn
+                enemyTurn();
+            }, 600);
         }
 
         function enemyTurn() {
@@ -415,14 +419,15 @@
                 return;
             }
 
-            render(); // ensure DOM has current player
+            // Render current state so .player exists
+            render();
 
             const startTile = getTile(player.x, player.y);
             const endTile = getTile(nx, ny);
 
             const playerDiv = startTile.querySelector(".player");
             if (!playerDiv) {
-                // fallback: no animation, just move
+                // fallback: no animation
                 player.x = nx;
                 player.y = ny;
                 if (player.shieldCooldown > 0) player.shieldCooldown--;
@@ -476,6 +481,10 @@
 
         function shoot() {
             if (!playerTurn) return;
+            if (hasShotThisTurn) {
+                log("You already shot this turn.");
+                return;
+            }
             if (!enemy || enemy.hp <= 0) {
                 log("No enemy to shoot.");
                 return;
@@ -503,6 +512,7 @@
                 return;
             }
 
+            hasShotThisTurn = true;
             fireBullet(dirX, dirY);
         }
 

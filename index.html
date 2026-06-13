@@ -61,7 +61,6 @@
             text-shadow: 2px 2px 4px black;
         }
 
-        /* Shield visual */
         .shield {
             position: absolute;
             width: 110%;
@@ -72,7 +71,6 @@
             pointer-events: none;
         }
 
-        /* Comet bullet */
         .bullet {
             position: absolute;
             width: 14px;
@@ -83,7 +81,6 @@
             z-index: 999;
         }
 
-        /* Enemy bullet (future use) */
         .enemybullet {
             background: #ff4444;
             box-shadow: 0 0 12px 6px #ff4444;
@@ -106,7 +103,6 @@
             font-size: 14px;
         }
 
-        /* HOME SCREEN */
         #homescreen {
             position: fixed;
             top: 0; left: 0;
@@ -136,7 +132,6 @@
             border-radius: 5px;
         }
 
-        /* GAME OVER SCREEN */
         #gameover {
             position: fixed;
             top: 0; left: 0;
@@ -153,7 +148,6 @@
 </head>
 <body>
 
-    <!-- HOME SCREEN -->
     <div id="homescreen">
         <h1 style="font-size: 60px;">Chess RPG</h1>
         <input id="playername" placeholder="Enter your name">
@@ -175,7 +169,6 @@
         <div id="log"></div>
     </div>
 
-    <!-- GAME OVER SCREEN -->
     <div id="gameover">
         <h1 style="font-size: 80px; margin: 0;">CHECKMATE</h1>
         <p style="font-size: 24px; opacity: 0.8;">You have been defeated.</p>
@@ -202,7 +195,6 @@
         let tiles = [];
         let playerTurn = true;
 
-        // Create board
         for (let y = 0; y < BOARD_SIZE; y++) {
             for (let x = 0; x < BOARD_SIZE; x++) {
                 const tile = document.createElement("div");
@@ -229,7 +221,6 @@
         function render() {
             tiles.forEach(t => t.innerHTML = "");
 
-            // Player
             const pTile = getTile(player.x, player.y);
             const pDiv = document.createElement("div");
             pDiv.classList.add("player");
@@ -247,7 +238,6 @@
                 pTile.appendChild(shield);
             }
 
-            // Enemy
             if (enemy && enemy.hp > 0) {
                 const eTile = getTile(enemy.x, enemy.y);
                 const eDiv = document.createElement("div");
@@ -268,7 +258,6 @@
             turnEl.textContent = playerTurn ? "Player" : "Enemy";
         }
 
-        // HOME SCREEN START
         function startGame() {
             const nameInput = document.getElementById("playername").value.trim();
             if (nameInput.length > 0) playerName = nameInput;
@@ -280,7 +269,6 @@
             log("Welcome, " + playerName + "! Your turn.");
         }
 
-        // GAME OVER SCREEN
         function gameOver() {
             const screen = document.getElementById("gameover");
             screen.style.display = "flex";
@@ -289,17 +277,14 @@
             log("GAME OVER");
         }
 
-        // Spawn new enemy for next wave
         function spawnEnemy() {
             wave++;
             waveEl.textContent = wave;
 
-            // Heal 10%
             const heal = Math.floor(player.hp * 0.1);
             player.hp += heal;
             log("You heal " + heal + " HP for the new wave!");
 
-            // Random spawn not on player
             let ex, ey;
             do {
                 ex = Math.floor(Math.random() * BOARD_SIZE);
@@ -319,7 +304,6 @@
             render();
         }
 
-        // BFS pathfinding
         function findNextStep(startX, startY, targetX, targetY) {
             const dirs = [
                 { dx: 1, dy: 0 },
@@ -388,7 +372,6 @@
                 return;
             }
 
-            // Attack if adjacent
             if (Math.abs(enemy.x - player.x) + Math.abs(enemy.y - player.y) === 1) {
                 if (player.shield) {
                     log(enemyName + " hits your shield!");
@@ -411,7 +394,6 @@
                 return;
             }
 
-            // Move toward player
             const nextStep = findNextStep(enemy.x, enemy.y, player.x, player.y);
             enemy.x = nextStep.x;
             enemy.y = nextStep.y;
@@ -463,16 +445,19 @@
                 return;
             }
 
-            // Check 3×3 zone
             const dx = enemy.x - player.x;
             const dy = enemy.y - player.y;
 
-            if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
+            if (dx !== 0 && dy !== 0) {
+                log("Enemy not in shooting direction.");
+                return;
+            }
+
+            if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
                 log("Enemy too far to shoot.");
                 return;
             }
 
-            // Auto-snap horizontally first
             let dirX = 0, dirY = 0;
 
             if (dx !== 0) dirX = dx > 0 ? 1 : -1;
@@ -508,7 +493,6 @@
                 const newTile = getTile(bx, by);
                 newTile.appendChild(bullet);
 
-                // Hit enemy
                 if (enemy && bx === enemy.x && by === enemy.y) {
                     enemy.hp -= player.atk;
                     log(playerName + " shoots " + enemyName + "! HP: " + enemy.hp);

@@ -2,8 +2,6 @@
 <html>
 <head>
     <title>Chess RPG 3D</title>
-
-    <!-- Three.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r152/three.min.js"></script>
 
     <style>
@@ -41,84 +39,25 @@
             background: #101010;
             font-size: 14px;
         }
-
-        #homescreen {
-            position: fixed;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            background: rgba(0,0,0,0.95);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            flex-direction: column;
-            z-index: 999999;
-        }
-
-        #homescreen input {
-            padding: 10px;
-            font-size: 20px;
-            margin-bottom: 20px;
-            width: 250px;
-            text-align: center;
-        }
-
-        #homescreen button {
-            padding: 10px 20px;
-            font-size: 22px;
-            cursor: pointer;
-            background: #00ff88;
-            border: none;
-            border-radius: 5px;
-        }
-
-        #gameover {
-            position: fixed;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            background: rgba(0,0,0,0.9);
-            display: none;
-            justify-content: center;
-            align-items: center;
-            flex-direction: column;
-            color: white;
-            z-index: 9999;
-        }
     </style>
 </head>
+
 <body>
 
-    <!-- HOME SCREEN -->
-    <div id="homescreen">
-        <h1 style="font-size: 60px;">Chess RPG 3D</h1>
-        <input id="playername" placeholder="Enter your name">
-        <button id="playbutton">Play</button>
-    </div>
-
-    <!-- 3D GAME AREA -->
     <div id="game-container"></div>
 
-    <!-- HUD -->
     <div id="hud">
-        <h1>Turn‑Based Chess RPG</h1>
+        <h1>Chess RPG 3D</h1>
         <div>HP: <span id="hp">20</span></div>
-        <div>Attack: <span id="atk">5</span></div>
+        <div>ATK: <span id="atk">5</span></div>
         <div>Wave: <span id="wave">1</span></div>
-        <div>Shield Cooldown: <span id="scd">0</span></div>
+        <div>Shield CD: <span id="scd">0</span></div>
         <div>Turn: <span id="turn">Player</span></div>
-        <p>Controls: W/A/S/D move, O shoot, P block</p>
         <div id="log"></div>
     </div>
 
-    <!-- GAME OVER -->
-    <div id="gameover">
-        <h1 style="font-size: 80px; margin: 0;">CHECKMATE</h1>
-        <p style="font-size: 24px; opacity: 0.8;">You have been defeated.</p>
-    </div>
-
-    <!-- GAME LOGIC -->
+    <!-- ORDER MATTERS -->
     <script src="main.js"></script>
-
-    <!-- 3D RENDERING -->
     <script src="game3d.js"></script>
 
 </body>

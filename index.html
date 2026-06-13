@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Chess RPG - Sliding + One Shot Per Turn</title>
+    <title>Chess RPG - Pawn + Sliding + Shooting</title>
     <style>
         body {
             margin: 0;
@@ -42,16 +42,48 @@
         .dark { background: #444; }
         .light { background: #bbb; color: #000; }
 
-        .player, .enemy {
-            width: 80%;
-            height: 80%;
-            border-radius: 50%;
-            border: 2px solid #fff;
+        /* --------------------------- */
+        /*      CSS PAWN (PLAYER)      */
+        /* --------------------------- */
+        .player {
+            width: 60%;
+            height: 60%;
             position: relative;
         }
 
-        .player { background: #00ff88; }
-        .enemy { background: #ff4444; }
+        .player::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 50%;
+            width: 40%;
+            height: 40%;
+            background: white;
+            border-radius: 50%;
+            transform: translateX(-50%);
+        }
+
+        .player::after {
+            content: "";
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            width: 70%;
+            height: 50%;
+            background: white;
+            border-radius: 50% 50% 20% 20%;
+            transform: translateX(-50%);
+        }
+
+        /* Enemy stays red circle for now */
+        .enemy {
+            width: 80%;
+            height: 80%;
+            border-radius: 50%;
+            background: #ff4444;
+            border: 2px solid #fff;
+            position: relative;
+        }
 
         .nametag {
             position: absolute;
@@ -401,6 +433,9 @@
             render();
         }
 
+        /* -------------------------------------------------- */
+        /*                FIXED SLIDING MOVEMENT              */
+        /* -------------------------------------------------- */
         function movePlayer(dx, dy) {
             if (!playerTurn) return;
 
@@ -429,6 +464,7 @@
                 return;
             }
 
+            // Get center positions
             const startRect = startTile.getBoundingClientRect();
             const endRect = endTile.getBoundingClientRect();
 
@@ -440,6 +476,7 @@
             const dxPixels = endX - startX;
             const dyPixels = endY - startY;
 
+            // Animate real player
             playerDiv.style.transition = "transform 0.25s linear";
             nameTag.style.transition = "transform 0.25s linear";
 
@@ -447,6 +484,7 @@
             nameTag.style.transform = `translate(${dxPixels}px, ${dyPixels}px)`;
 
             setTimeout(() => {
+                // Reset transform and move to new tile
                 playerDiv.style.transition = "";
                 nameTag.style.transition = "";
                 playerDiv.style.transform = "";
@@ -539,35 +577,4 @@
                     bullet.remove();
 
                     if (enemy.hp <= 0) {
-                        log(enemyName + " defeated!");
-                        enemy = null;
-                        spawnEnemy();
-                        render();
-                        return;
-                    }
-
-                    render();
-                    return;
-                }
-
-                requestAnimationFrame(step);
-            }
-
-            requestAnimationFrame(step);
-        }
-
-        document.addEventListener("keydown", e => {
-            if (!playerTurn) return;
-
-            if (e.key === "w") movePlayer(0, -1);
-            if (e.key === "s") movePlayer(0, 1);
-            if (e.key === "a") movePlayer(-1, 0);
-            if (e.key === "d") movePlayer(1, 0);
-
-            if (e.key === "o") shoot();
-            if (e.key === "p") block();
-        });
-    </script>
-
-</body>
-</html>
+                        log(enemyName

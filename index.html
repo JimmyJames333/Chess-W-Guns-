@@ -142,7 +142,7 @@
             turnEl.textContent = playerTurn ? "Player" : "Enemy";
         }
 
-        // Simple BFS pathfinding on grid
+        // BFS pathfinding
         function findNextStep(startX, startY, targetX, targetY) {
             const dirs = [
                 { dx: 1, dy: 0 },
@@ -182,12 +182,8 @@
                 }
             }
 
-            // Reconstruct path
             const targetKey = key(targetX, targetY);
-            if (!parent[targetKey]) {
-                // No path found, fallback: stay still
-                return { x: startX, y: startY };
-            }
+            if (!parent[targetKey]) return { x: startX, y: startY };
 
             let step = { x: targetX, y: targetY };
             let prev = parent[key(step.x, step.y)];
@@ -209,35 +205,28 @@
 
         function enemyTurn() {
             if (enemy.hp <= 0) {
-                log("Enemy is dead.");
                 playerTurn = true;
                 document.body.style.pointerEvents = "auto";
                 render();
                 return;
             }
 
-            // If next to player, attack
+            // Attack if adjacent
             if (Math.abs(enemy.x - player.x) + Math.abs(enemy.y - player.y) === 1) {
                 player.hp -= enemy.atk;
                 log("Enemy attacks you for " + enemy.atk + " damage!");
-                if (player.hp <= 0) {
-                    log("You died. Game over.");
-                }
+                if (player.hp <= 0) log("You died. Game over.");
                 playerTurn = true;
                 document.body.style.pointerEvents = "auto";
                 render();
                 return;
             }
 
-            // Pathfind toward player
+            // Move toward player
             const nextStep = findNextStep(enemy.x, enemy.y, player.x, player.y);
-            if (nextStep.x !== enemy.x || nextStep.y !== enemy.y) {
-                enemy.x = nextStep.x;
-                enemy.y = nextStep.y;
-                log("Enemy moves to " + enemy.x + "," + enemy.y);
-            } else {
-                log("Enemy waits.");
-            }
+            enemy.x = nextStep.x;
+            enemy.y = nextStep.y;
+            log("Enemy moves to " + enemy.x + "," + enemy.y);
 
             playerTurn = true;
             document.body.style.pointerEvents = "auto";
@@ -268,7 +257,12 @@
             if (player.x === enemy.x && player.y === enemy.y) {
                 enemy.hp -= player.atk;
                 log("You hit the enemy! Enemy HP: " + enemy.hp);
-                if (enemy.hp <= 0) log("Enemy defeated!");
+
+                if (enemy.hp <= 0) {
+                    log("Enemy defeated!");
+                    render();
+                    return; // IMPORTANT: stop turn immediately
+                }
             } else {
                 log("No enemy here.");
             }

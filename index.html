@@ -75,7 +75,7 @@
             transform: translateX(-50%);
         }
 
-        /* Enemy stays red circle for now */
+        /* Enemy stays red circle */
         .enemy {
             width: 80%;
             height: 80%;
@@ -139,7 +139,7 @@
             justify-content: center;
             align-items: center;
             flex-direction: column;
-            z-index: 9999;
+            z-index: 999999;
         }
 
         #homescreen input {
@@ -175,10 +175,11 @@
 </head>
 <body>
 
+    <!-- HOME SCREEN -->
     <div id="homescreen">
         <h1 style="font-size: 60px;">Chess RPG</h1>
         <input id="playername" placeholder="Enter your name">
-        <button onclick="startGame()">Play</button>
+        <button id="playbutton">Play</button>
     </div>
 
     <div id="game-container">
@@ -202,6 +203,10 @@
     </div>
 
     <script>
+        /* --------------------------- */
+        /*        GAME VARIABLES       */
+        /* --------------------------- */
+
         const boardEl = document.getElementById("board");
         const hpEl = document.getElementById("hp");
         const atkEl = document.getElementById("atk");
@@ -223,6 +228,10 @@
         let playerTurn = true;
         let hasShotThisTurn = false;
 
+        /* --------------------------- */
+        /*        BOARD CREATION       */
+        /* --------------------------- */
+
         for (let y = 0; y < BOARD_SIZE; y++) {
             for (let x = 0; x < BOARD_SIZE; x++) {
                 const tile = document.createElement("div");
@@ -239,12 +248,20 @@
             return tiles.find(t => Number(t.dataset.x) === x && Number(t.dataset.y) === y);
         }
 
+        /* --------------------------- */
+        /*        LOG FUNCTION         */
+        /* --------------------------- */
+
         function log(msg) {
             const p = document.createElement("p");
             p.textContent = msg;
             logEl.appendChild(p);
             logEl.scrollTop = logEl.scrollHeight;
         }
+
+        /* --------------------------- */
+        /*        RENDER FUNCTION      */
+        /* --------------------------- */
 
         function render() {
             tiles.forEach(t => t.innerHTML = "");
@@ -286,6 +303,12 @@
             turnEl.textContent = playerTurn ? "Player" : "Enemy";
         }
 
+        /* --------------------------- */
+        /*        START GAME           */
+        /* --------------------------- */
+
+        document.getElementById("playbutton").addEventListener("click", startGame);
+
         function startGame() {
             const nameInput = document.getElementById("playername").value.trim();
             if (nameInput.length > 0) playerName = nameInput;
@@ -297,6 +320,10 @@
             log("Welcome, " + playerName + "! Your turn.");
         }
 
+        /* --------------------------- */
+        /*        GAME OVER            */
+        /* --------------------------- */
+
         function gameOver() {
             const screen = document.getElementById("gameover");
             screen.style.display = "flex";
@@ -304,6 +331,10 @@
             document.body.style.pointerEvents = "none";
             log("GAME OVER");
         }
+
+        /* --------------------------- */
+        /*        SPAWN ENEMY          */
+        /* --------------------------- */
 
         function spawnEnemy() {
             wave++;
@@ -331,6 +362,10 @@
             log("Wave " + wave + " begins! " + enemyName + " appears.");
             render();
         }
+
+        /* --------------------------- */
+        /*        PATHFINDING          */
+        /* --------------------------- */
 
         function findNextStep(startX, startY, targetX, targetY) {
             const dirs = [
@@ -385,6 +420,10 @@
             return step;
         }
 
+        /* --------------------------- */
+        /*        TURN SYSTEM          */
+        /* --------------------------- */
+
         function endPlayerTurn() {
             playerTurn = false;
             hasShotThisTurn = false;
@@ -433,9 +472,10 @@
             render();
         }
 
-        /* -------------------------------------------------- */
-        /*                FIXED SLIDING MOVEMENT              */
-        /* -------------------------------------------------- */
+        /* --------------------------- */
+        /*        SLIDING MOVEMENT     */
+        /* --------------------------- */
+
         function movePlayer(dx, dy) {
             if (!playerTurn) return;
 
@@ -484,7 +524,6 @@
             nameTag.style.transform = `translate(${dxPixels}px, ${dyPixels}px)`;
 
             setTimeout(() => {
-                // Reset transform and move to new tile
                 playerDiv.style.transition = "";
                 nameTag.style.transition = "";
                 playerDiv.style.transform = "";
@@ -501,6 +540,10 @@
             }, 250);
         }
 
+        /* --------------------------- */
+        /*        BLOCK ACTION         */
+        /* --------------------------- */
+
         function block() {
             if (!playerTurn) return;
 
@@ -514,6 +557,10 @@
 
             render();
         }
+
+        /* --------------------------- */
+        /*        SHOOTING             */
+        /* --------------------------- */
 
         function shoot() {
             if (!playerTurn) return;
@@ -542,39 +589,4 @@
             let dirX = 0, dirY = 0;
 
             if (dx !== 0) dirX = dx > 0 ? 1 : -1;
-            else if (dy !== 0) dirY = dy > 0 ? 1 : -1;
-
-            hasShotThisTurn = true;
-            fireBullet(dirX, dirY);
-        }
-
-        function fireBullet(dx, dy) {
-            const bullet = document.createElement("div");
-            bullet.classList.add("bullet");
-
-            const tile = getTile(player.x, player.y);
-            tile.appendChild(bullet);
-
-            let bx = player.x;
-            let by = player.y;
-
-            function step() {
-                bx += dx;
-                by += dy;
-
-                if (bx < 0 || bx >= BOARD_SIZE || by < 0 || by >= BOARD_SIZE) {
-                    bullet.remove();
-                    render();
-                    return;
-                }
-
-                const newTile = getTile(bx, by);
-                newTile.appendChild(bullet);
-
-                if (enemy && bx === enemy.x && by === enemy.y) {
-                    enemy.hp -= player.atk;
-                    log(playerName + " shoots " + enemyName + "! HP: " + enemy.hp);
-                    bullet.remove();
-
-                    if (enemy.hp <= 0) {
-                        log(enemyName
+            else if (dy !== 0) dirY = dy > 

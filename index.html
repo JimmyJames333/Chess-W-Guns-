@@ -1,7 +1,11 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Chess RPG - Pawn + Sliding + Shooting</title>
+    <title>Chess RPG 3D</title>
+
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r152/three.min.js"></script>
+
     <style>
         body {
             margin: 0;
@@ -19,121 +23,7 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            perspective: 800px;
-        }
-
-        #board {
-            width: 960px;
-            height: 960px;
-            display: grid;
-            grid-template-columns: repeat(8, 1fr);
-            grid-template-rows: repeat(8, 1fr);
-            transform: rotateX(60deg) translateY(40px);
-        }
-
-        .tile {
-            border: 1px solid #333;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            position: relative;
-        }
-
-        .dark { background: #444; }
-        .light { background: #bbb; color: #000; }
-
-        /* --------------------------- */
-        /*      CSS PAWN (PLAYER)      */
-        /* --------------------------- */
-        .player {
-            width: 60%;
-            height: 60%;
-            position: relative;
-        }
-
-        .player::before {
-            content: "";
-            position: absolute;
-            top: 0;
-            left: 50%;
-            width: 40%;
-            height: 40%;
-            background: white;
-            border-radius: 50%;
-            transform: translateX(-50%);
-        }
-
-        .player::after {
-            content: "";
-            position: absolute;
-            bottom: 0;
-            left: 50%;
-            width: 70%;
-            height: 50%;
-            background: white;
-            border-radius: 50% 50% 20% 20%;
-            transform: translateX(-50%);
-        }
-
-        /* --------------------------- */
-        /*  AGGRESSIVE BLACK PAWN ENEMY */
-        /* --------------------------- */
-        .enemy {
-            width: 70%;
-            height: 70%;
-            position: relative;
-        }
-
-        .enemy::before {
-            content: "";
-            position: absolute;
-            top: 5%;
-            left: 50%;
-            width: 30%;
-            height: 30%;
-            background: black;
-            border-radius: 50%;
-            transform: translateX(-50%);
-        }
-
-        .enemy::after {
-            content: "";
-            position: absolute;
-            bottom: 0;
-            left: 50%;
-            width: 85%;
-            height: 55%;
-            background: black;
-            border-radius: 60% 60% 10% 10%;
-            transform: translateX(-50%);
-        }
-
-        .nametag {
-            position: absolute;
-            top: -20px;
-            font-size: 14px;
-            font-weight: bold;
-            text-shadow: 2px 2px 4px black;
-        }
-
-        .shield {
-            position: absolute;
-            width: 110%;
-            height: 110%;
-            border-radius: 50%;
-            border: 3px solid #00aaff;
-            box-shadow: 0 0 15px #00aaff;
-            pointer-events: none;
-        }
-
-        .bullet {
-            position: absolute;
-            width: 14px;
-            height: 14px;
-            border-radius: 50%;
-            background: #4db8ff;
-            box-shadow: 0 0 12px 6px #4db8ff;
-            z-index: 999;
+            background: #000;
         }
 
         #hud {
@@ -197,17 +87,16 @@
     </style>
 </head>
 <body>
+
     <!-- HOME SCREEN -->
     <div id="homescreen">
-        <h1 style="font-size: 60px;">Chess RPG</h1>
+        <h1 style="font-size: 60px;">Chess RPG 3D</h1>
         <input id="playername" placeholder="Enter your name">
         <button id="playbutton">Play</button>
     </div>
 
-    <!-- GAME AREA -->
-    <div id="game-container">
-        <div id="board"></div>
-    </div>
+    <!-- 3D GAME AREA -->
+    <div id="game-container"></div>
 
     <!-- HUD -->
     <div id="hud">
@@ -232,7 +121,6 @@
         /*        GAME VARIABLES       */
         /* --------------------------- */
 
-        const boardEl = document.getElementById("board");
         const hpEl = document.getElementById("hp");
         const atkEl = document.getElementById("atk");
         const waveEl = document.getElementById("wave");
@@ -243,35 +131,14 @@
         let playerName = "Player";
         let enemyName = "Enemy";
 
-        const BOARD_SIZE = 64;
+        const BOARD_SIZE = 8; // change to 64 if you want huge board
 
         let player = { x: 0, y: 7, hp: 20, atk: 5, shield: false, shieldCooldown: 0 };
         let enemy = null;
         let wave = 1;
 
-        let tiles = [];
         let playerTurn = true;
         let hasShotThisTurn = false;
-
-        /* --------------------------- */
-        /*        BOARD CREATION       */
-        /* --------------------------- */
-
-        for (let y = 0; y < BOARD_SIZE; y++) {
-            for (let x = 0; x < BOARD_SIZE; x++) {
-                const tile = document.createElement("div");
-                tile.classList.add("tile");
-                tile.classList.add((x + y) % 2 === 0 ? "light" : "dark");
-                tile.dataset.x = x;
-                tile.dataset.y = y;
-                boardEl.appendChild(tile);
-                tiles.push(tile);
-            }
-        }
-
-        function getTile(x, y) {
-            return tiles.find(t => Number(t.dataset.x) === x && Number(t.dataset.y) === y);
-        }
 
         /* --------------------------- */
         /*        LOG FUNCTION         */
@@ -289,45 +156,24 @@
         /* --------------------------- */
 
         function render() {
-            tiles.forEach(t => t.innerHTML = "");
-
-            // Player
-            const pTile = getTile(player.x, player.y);
-            const pDiv = document.createElement("div");
-            pDiv.classList.add("player");
-
-            const pName = document.createElement("div");
-            pName.classList.add("nametag");
-            pName.textContent = playerName;
-
-            pTile.appendChild(pDiv);
-            pTile.appendChild(pName);
-
-            if (player.shield) {
-                const shield = document.createElement("div");
-                shield.classList.add("shield");
-                pTile.appendChild(shield);
-            }
-
-            // Enemy
-            if (enemy && enemy.hp > 0) {
-                const eTile = getTile(enemy.x, enemy.y);
-                const eDiv = document.createElement("div");
-                eDiv.classList.add("enemy");
-
-                const eName = document.createElement("div");
-                eName.classList.add("nametag");
-                eName.textContent = enemyName;
-
-                eTile.appendChild(eDiv);
-                eTile.appendChild(eName);
-            }
-
             hpEl.textContent = player.hp;
             atkEl.textContent = player.atk;
             waveEl.textContent = wave;
             scdEl.textContent = player.shieldCooldown;
             turnEl.textContent = playerTurn ? "Player" : "Enemy";
+
+            // sync 3D if available
+            if (typeof player3D !== "undefined") {
+                player3D.position.set(player.x, 0.2, player.y);
+            }
+            if (typeof enemy3D !== "undefined") {
+                if (enemy && enemy.hp > 0) {
+                    enemy3D.visible = true;
+                    enemy3D.position.set(enemy.x, 0.2, enemy.y);
+                } else {
+                    enemy3D.visible = false;
+                }
+            }
         }
 
         /* --------------------------- */
@@ -389,6 +235,7 @@
             log("Wave " + wave + " begins! " + enemyName + " appears.");
             render();
         }
+
         /* --------------------------- */
         /*        PATHFINDING          */
         /* --------------------------- */
@@ -466,7 +313,6 @@
                 return;
             }
 
-            // Attack if adjacent
             if (Math.abs(enemy.x - player.x) + Math.abs(enemy.y - player.y) === 1) {
                 if (player.shield) {
                     log(enemyName + " hits your shield!");
@@ -489,7 +335,6 @@
                 return;
             }
 
-            // Move toward player
             const nextStep = findNextStep(enemy.x, enemy.y, player.x, player.y);
             enemy.x = nextStep.x;
             enemy.y = nextStep.y;
@@ -501,7 +346,7 @@
         }
 
         /* --------------------------- */
-        /*        SLIDING MOVEMENT     */
+        /*        MOVEMENT             */
         /* --------------------------- */
 
         function movePlayer(dx, dy) {
@@ -515,57 +360,14 @@
                 return;
             }
 
-            render(); // ensure player exists
+            player.x = nx;
+            player.y = ny;
 
-            const startTile = getTile(player.x, player.y);
-            const endTile = getTile(nx, ny);
+            if (player.shieldCooldown > 0) player.shieldCooldown--;
 
-            const playerDiv = startTile.querySelector(".player");
-            const nameTag = startTile.querySelector(".nametag");
-
-            if (!playerDiv || !nameTag) {
-                player.x = nx;
-                player.y = ny;
-                if (player.shieldCooldown > 0) player.shieldCooldown--;
-                log(playerName + " moves to " + nx + "," + ny);
-                endPlayerTurn();
-                return;
-            }
-
-            // Get center positions
-            const startRect = startTile.getBoundingClientRect();
-            const endRect = endTile.getBoundingClientRect();
-
-            const startX = startRect.left + startRect.width / 2;
-            const startY = startRect.top + startRect.height / 2;
-            const endX = endRect.left + endRect.width / 2;
-            const endY = endRect.top + endRect.height / 2;
-
-            const dxPixels = endX - startX;
-            const dyPixels = endY - startY;
-
-            // Animate real player
-            playerDiv.style.transition = "transform 0.25s linear";
-            nameTag.style.transition = "transform 0.25s linear";
-
-            playerDiv.style.transform = `translate(${dxPixels}px, ${dyPixels}px)`;
-            nameTag.style.transform = `translate(${dxPixels}px, ${dyPixels}px)`;
-
-            setTimeout(() => {
-                playerDiv.style.transition = "";
-                nameTag.style.transition = "";
-                playerDiv.style.transform = "";
-                nameTag.style.transform = "";
-
-                player.x = nx;
-                player.y = ny;
-
-                if (player.shieldCooldown > 0) player.shieldCooldown--;
-
-                log(playerName + " moves to " + nx + "," + ny);
-                render();
-                endPlayerTurn();
-            }, 250);
+            log(playerName + " moves to " + nx + "," + ny);
+            render();
+            endPlayerTurn();
         }
 
         /* --------------------------- */
@@ -628,12 +430,6 @@
         /* --------------------------- */
 
         function fireBullet(dx, dy) {
-            const bullet = document.createElement("div");
-            bullet.classList.add("bullet");
-
-            const tile = getTile(player.x, player.y);
-            tile.appendChild(bullet);
-
             let bx = player.x;
             let by = player.y;
 
@@ -642,18 +438,13 @@
                 by += dy;
 
                 if (bx < 0 || bx >= BOARD_SIZE || by < 0 || by >= BOARD_SIZE) {
-                    bullet.remove();
                     render();
                     return;
                 }
 
-                const newTile = getTile(bx, by);
-                newTile.appendChild(bullet);
-
                 if (enemy && bx === enemy.x && by === enemy.y) {
                     enemy.hp -= player.atk;
                     log(playerName + " shoots " + enemyName + "! HP: " + enemy.hp);
-                    bullet.remove();
 
                     if (enemy.hp <= 0) {
                         log(enemyName + " defeated!");
@@ -688,7 +479,9 @@
             if (e.key === "o") shoot();
             if (e.key === "p") block();
         });
-
     </script>
+
+    <!-- 3D RENDERING FILE -->
+    <script src="game3d.js"></script>
 </body>
 </html>
